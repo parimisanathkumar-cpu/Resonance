@@ -5,35 +5,36 @@ const MOCK_CATEGORIES = ['All', 'Podcasts', 'Live Events', 'New Releases', 'Pop'
 
 const MOCK_RESULTS = [
   {
-    id: 'fHI8X4OXluQ',
-    title: 'The Weeknd - Blinding Lights (Official Video)',
-    artist: 'The Weeknd',
-    coverArt: 'https://i.ytimg.com/vi/fHI8X4OXluQ/maxresdefault.jpg'
+    id: 'jfKfPfyJRdk',
+    title: 'Lofi Hip Hop Radio - Beats to Relax/Study to',
+    artist: 'Lofi Girl',
+    coverArt: 'https://i.ytimg.com/vi/jfKfPfyJRdk/maxresdefault.jpg'
   },
   {
-    id: 'v2AC41dglnM',
-    title: 'AC/DC - Thunderstruck (Official Video)',
-    artist: 'AC/DC',
-    coverArt: 'https://i.ytimg.com/vi/v2AC41dglnM/maxresdefault.jpg'
+    id: 'K4DyBUG242c',
+    title: 'Cartoon - On & On (feat. Daniel Levi) [NCS Release]',
+    artist: 'NoCopyrightSounds',
+    coverArt: 'https://i.ytimg.com/vi/K4DyBUG242c/maxresdefault.jpg'
   },
   {
-    id: '09R8_2nJtjg',
-    title: 'Maroon 5 - Sugar (Official Music Video)',
-    artist: 'Maroon 5',
-    coverArt: 'https://i.ytimg.com/vi/09R8_2nJtjg/maxresdefault.jpg'
+    id: 'dQw4w9WgXcQ',
+    title: 'Rick Astley - Never Gonna Give You Up (Official Music Video)',
+    artist: 'Rick Astley',
+    coverArt: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg'
   },
   {
-    id: 'JGwWNGJdvx8',
-    title: 'Ed Sheeran - Shape of You (Official Music Video)',
-    artist: 'Ed Sheeran',
-    coverArt: 'https://i.ytimg.com/vi/JGwWNGJdvx8/maxresdefault.jpg'
+    id: '4xDzrUhVKVA',
+    title: 'Synthwave Radio - Beats to chill/game to',
+    artist: 'Lofi Girl',
+    coverArt: 'https://i.ytimg.com/vi/4xDzrUhVKVA/maxresdefault.jpg'
   }
 ];
 
-const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) => {
-  const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [results, setResults] = useState(MOCK_RESULTS);
+const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, globalQuery, setGlobalQuery, onNavigate, searchCache, setSearchCache }) => {
+  const [activeCategory, setActiveCategory] = useState(searchCache.category || 'All');
+  const [songResults, setSongResults] = useState(searchCache.songResults || MOCK_RESULTS);
+  const [artistResults, setArtistResults] = useState(searchCache.artistResults || []);
+  const [albumResults, setAlbumResults] = useState(searchCache.albumResults || []);
   const [isSearching, setIsSearching] = useState(false);
 
   // Helper to decode HTML entities from YouTube API
@@ -44,8 +45,18 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) =
   };
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults(MOCK_RESULTS);
+    if (!globalQuery.trim()) {
+      setSongResults(MOCK_RESULTS);
+      setArtistResults([]);
+      setAlbumResults([]);
+      return;
+    }
+
+    // Check cache
+    if (globalQuery === searchCache.query && activeCategory === searchCache.category && searchCache.songResults.length > 0) {
+      setSongResults(searchCache.songResults);
+      setArtistResults(searchCache.artistResults);
+      setAlbumResults(searchCache.albumResults);
       return;
     }
 
@@ -53,19 +64,75 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) =
       setIsSearching(true);
       try {
         const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
-        // fetch search results (type=video avoids channels/playlists)
-        const res = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=24&q=${encodeURIComponent(query)}&type=video&key=${apiKey}`);
-        const data = await res.json();
-        
-        if (data.items) {
-          const formattedResults = data.items.map(item => ({
-            id: item.id.videoId,
-            title: decodeHTML(item.snippet.title),
-            artist: decodeHTML(item.snippet.channelTitle),
-            coverArt: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url
-          }));
-          setResults(formattedResults);
-        }
+        const q = encodeURIComponent(globalQuery);
+
+        let albumPromise = Promise.resolve([]);
+        let finalAlbums = [];
+
+        // 3. Albums Fetch
+        if (activeCategory === 'All' || activeCategory === 'Albums' || activeCategory === 'Playlists') {
+          const albumQ = encodeURIComponent(globalQuery + " album");
+          albumPromise = fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=8&q=${albumQ}&type=playlist&key=${apiKey}`)
+            .then(res => res.json())
+            .then(data => data.items ? data.items.map(item => ({
+              id: item.id.playlistId, type: 'album',
+              title: decodeHTML(item.snippet.title),
+              artist: decodeHTML(item.snippet.channelTitle),
+              coverArt: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url
+            })) : [])
+            .then(res => { setAlbumResults(res); finalAlbums = res; return res; });
+        } else { setAlbumResults([]); }
+
+        // 1. Songs Fetch
+        let songItems = [];
+        let finalSongs = [];
+        if (activeCategory === 'All' || activeCategory === 'Songs' || activeCategory === 'Artists' || activeCategory === 'Profiles') {
+          const res = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=24&q=${q}&type=video&videoCategoryId=10&key=${apiKey}`);
+          const data = await res.json();
+          songItems = data.items || [];
+          
+          if (activeCategory === 'All' || activeCategory === 'Songs') {
+            finalSongs = songItems.map(item => ({
+              id: item.id.videoId, type: 'song',
+              title: decodeHTML(item.snippet.title),
+              artist: decodeHTML(item.snippet.channelTitle),
+              coverArt: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url
+            }));
+            setSongResults(finalSongs);
+          } else { setSongResults([]); }
+        } else { setSongResults([]); }
+
+        // 2. Artists Fetch
+        let finalArtists = [];
+        if (activeCategory === 'All' || activeCategory === 'Artists' || activeCategory === 'Profiles') {
+           const uniqueChannelIds = [...new Set(songItems.slice(0, 12).map(item => item.snippet.channelId))].slice(0, 6);
+           
+           if (uniqueChannelIds.length > 0) {
+             const channelRes = await fetch(`https://youtube.googleapis.com/youtube/v3/channels?part=snippet&id=${uniqueChannelIds.join(',')}&key=${apiKey}`);
+             const channelData = await channelRes.json();
+             
+             if (channelData.items) {
+               finalArtists = channelData.items.map(item => ({
+                 id: item.id, type: 'artist',
+                 title: decodeHTML(item.snippet.title),
+                 coverArt: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url
+               }));
+               setArtistResults(finalArtists);
+             } else { setArtistResults([]); }
+           } else { setArtistResults([]); }
+        } else { setArtistResults([]); }
+
+        await albumPromise;
+
+        // Update cache
+        setSearchCache({
+          query: globalQuery,
+          category: activeCategory,
+          songResults: finalSongs,
+          artistResults: finalArtists,
+          albumResults: finalAlbums
+        });
+
       } catch (err) {
         console.error("YouTube Search failed", err);
       } finally {
@@ -74,38 +141,11 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) =
     }, 600); // 600ms debounce
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [globalQuery, activeCategory]);
 
   return (
     <div className="animate-enter" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '32px', paddingBottom: '60px' }}>
       
-      {/* Big Search Header */}
-      <div style={{ position: 'relative', width: '100%', maxWidth: '600px', marginBottom: '32px' }}>
-        <Search size={24} color="var(--text-main)" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)' }} />
-        <input 
-          type="text" 
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="What do you want to listen to?"
-          className="search-input"
-          style={{
-            width: '100%',
-            padding: '16px 20px 16px 56px',
-            borderRadius: '12px',
-            border: '1px solid var(--border-active)',
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            color: 'var(--text-main)',
-            fontSize: '16px',
-            fontWeight: '500',
-            outline: 'none',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-            transition: 'all 0.2s ease',
-          }}
-          onFocus={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
-          onBlur={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }}
-        />
-      </div>
-
       {/* Category Pills */}
       <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '16px', marginBottom: '24px' }}>
         {MOCK_CATEGORIES.map(cat => (
@@ -131,91 +171,301 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) =
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: '600', margin: 0 }}>
-          {query.trim() ? `Search results for "${query}"` : 'Browse all'}
+          {globalQuery.trim() ? `Search results for "${globalQuery}"` : 'Browse all'}
         </h2>
         {isSearching && <Loader2 className="animate-spin" size={20} color="var(--text-muted)" style={{ animation: 'spin 1s linear infinite' }} />}
       </div>
 
-      {/* Results Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '24px'
-      }}>
-        <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
-        {results.map(track => {
-          const isThisTrackActive = currentTrack?.id === track.id;
-          const isTrackPlaying = isThisTrackActive && globalIsPlaying;
+      <style>{`
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .list-row:hover { background-color: rgba(255,255,255,0.1); }
+        .list-row:hover .row-play-btn { opacity: 1 !important; }
+      `}</style>
 
-          return (
+      {songResults.length > 0 ? (
+        <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
+          
+          {/* Top Result Column */}
+          <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '16px' }}>Top result</h2>
             <div 
-              key={track.id} 
-              className="premium-card"
-              style={{
-                padding: '16px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                backgroundColor: 'transparent'
-              }}
-              onClick={() => onPlayTrack(track)}
+              onClick={() => onPlayTrack(songResults[0])}
               onMouseEnter={(e) => {
                 e.currentTarget.querySelector('.play-btn-circle').style.opacity = '1';
                 e.currentTarget.querySelector('.play-btn-circle').style.transform = 'translateY(0)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.querySelector('.play-btn-circle').style.opacity = isThisTrackActive ? '1' : '0';
-                e.currentTarget.querySelector('.play-btn-circle').style.transform = isThisTrackActive ? 'translateY(0)' : 'translateY(8px)';
+                const isTopActive = currentTrack?.id === songResults[0].id;
+                e.currentTarget.querySelector('.play-btn-circle').style.opacity = isTopActive ? '1' : '0';
+                e.currentTarget.querySelector('.play-btn-circle').style.transform = isTopActive ? 'translateY(0)' : 'translateY(8px)';
               }}
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                borderRadius: '8px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'background-color 0.2s ease',
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'}
             >
-              <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '8px', overflow: 'hidden', position: 'relative', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-                <img 
-                  src={track.coverArt} 
-                  alt={track.title}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-                
-                {/* Play Button Overlay */}
-                <div 
-                  className="play-btn-circle"
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    bottom: '12px',
-                    width: '40px', 
-                    height: '40px', 
-                    borderRadius: '50%', 
-                    backgroundColor: 'rgba(255,255,255,0.95)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    opacity: isThisTrackActive ? '1' : '0',
-                    transform: isThisTrackActive ? 'translateY(0)' : 'translateY(8px)',
-                    transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                  }}
-                >
-                  {isTrackPlaying ? (
-                     <Pause fill="black" color="black" size={18} />
-                  ) : (
-                     <Play fill="black" color="black" size={18} style={{ marginLeft: '2px' }}/>
-                  )}
+              <img 
+                src={songResults[0].coverArt} 
+                alt={songResults[0].title}
+                style={{ width: '92px', height: '92px', borderRadius: '4px', objectFit: 'cover', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}
+              />
+              <div>
+                <h3 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', display: '-webkit-box', letterSpacing: '-1px' }}>
+                  {songResults[0].title}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ backgroundColor: 'rgba(0,0,0,0.4)', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: '700' }}>Song</span>
+                  <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{songResults[0].artist}</span>
                 </div>
               </div>
 
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: '500', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {track.title}
-                </h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {track.artist}
-                </p>
+              {/* Play Button Overlay */}
+              <div 
+                className="play-btn-circle"
+                style={{
+                  position: 'absolute',
+                  right: '20px',
+                  bottom: '20px',
+                  width: '48px', 
+                  height: '48px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#1ed760',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+                  opacity: currentTrack?.id === songResults[0].id ? '1' : '0',
+                  transform: currentTrack?.id === songResults[0].id ? 'translateY(0)' : 'translateY(8px)',
+                  transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                }}
+              >
+                {(currentTrack?.id === songResults[0].id && globalIsPlaying) ? (
+                   <Pause fill="black" color="black" size={24} />
+                ) : (
+                   <Play fill="black" color="black" size={24} style={{ marginLeft: '2px' }}/>
+                )}
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+
+          {/* List Results Column */}
+          <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '16px' }}>Songs</h2>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {songResults.slice(1, 5).map(track => {
+                const isThisTrackActive = currentTrack?.id === track.id;
+                const isTrackPlaying = isThisTrackActive && globalIsPlaying;
+
+                return (
+                  <div 
+                    key={track.id}
+                    className="list-row"
+                    onClick={() => onPlayTrack(track)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s ease',
+                      gap: '16px'
+                    }}
+                  >
+                    <div style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
+                      <img 
+                        src={track.coverArt} 
+                        alt={track.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <div 
+                        className="row-play-btn"
+                        style={{
+                          position: 'absolute',
+                          top: 0, left: 0, right: 0, bottom: 0,
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          opacity: isThisTrackActive ? 1 : 0,
+                          transition: 'opacity 0.2s ease'
+                        }}
+                      >
+                        {isTrackPlaying ? (
+                          <Pause fill="white" color="white" size={16} />
+                        ) : (
+                          <Play fill="white" color="white" size={16} style={{ marginLeft: '2px' }}/>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+                      <span style={{ fontSize: '15px', fontWeight: isThisTrackActive ? '600' : '500', color: isThisTrackActive ? '#1ed760' : 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {track.title}
+                      </span>
+                      <span style={{ fontSize: '14px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {track.artist}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+                      3:45
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : (
+        activeCategory === 'Songs' && !isSearching && <div style={{ color: 'var(--text-muted)' }}>No songs found</div>
+      )}
+
+      {/* More Results Grid */}
+      {songResults.length > 5 && (
+        <div style={{ marginTop: '48px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px' }}>More songs</h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '24px'
+          }}>
+            {songResults.slice(5).map(track => {
+              const isThisTrackActive = currentTrack?.id === track.id;
+              const isTrackPlaying = isThisTrackActive && globalIsPlaying;
+
+              return (
+                <div 
+                  key={track.id} 
+                  className="premium-card"
+                  style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                    backgroundColor: 'transparent'
+                  }}
+                  onClick={() => onPlayTrack(track)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.querySelector('.play-btn-circle').style.opacity = '1';
+                    e.currentTarget.querySelector('.play-btn-circle').style.transform = 'translateY(0)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.querySelector('.play-btn-circle').style.opacity = isThisTrackActive ? '1' : '0';
+                    e.currentTarget.querySelector('.play-btn-circle').style.transform = isThisTrackActive ? 'translateY(0)' : 'translateY(8px)';
+                  }}
+                >
+                  <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '8px', overflow: 'hidden', position: 'relative', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                    <img 
+                      src={track.coverArt} 
+                      alt={track.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    
+                    {/* Play Button Overlay */}
+                    <div 
+                      className="play-btn-circle"
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        bottom: '12px',
+                        width: '40px', 
+                        height: '40px', 
+                        borderRadius: '50%', 
+                        backgroundColor: '#1ed760',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                        opacity: isThisTrackActive ? '1' : '0',
+                        transform: isThisTrackActive ? 'translateY(0)' : 'translateY(8px)',
+                        transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                      }}
+                    >
+                      {isTrackPlaying ? (
+                         <Pause fill="black" color="black" size={18} />
+                      ) : (
+                         <Play fill="black" color="black" size={18} style={{ marginLeft: '2px' }}/>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: '500', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {track.title}
+                    </h3>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {track.artist}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Artists Row */}
+      {artistResults.length > 0 && (
+        <div style={{ marginTop: '48px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px' }}>Artists</h2>
+          <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '24px' }}>
+            {artistResults.map(artist => (
+              <div 
+                key={artist.id}
+                className="premium-card"
+                onClick={() => onNavigate('artist', artist)}
+                style={{
+                  minWidth: '200px', maxWidth: '200px', padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'}
+              >
+                <img src={artist.coverArt} alt={artist.title} style={{ width: '150px', height: '150px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }} />
+                <div style={{ textAlign: 'center', width: '100%' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artist.title}</h3>
+                  <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Artist</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Albums Row */}
+      {albumResults.length > 0 && (
+        <div style={{ marginTop: '48px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px' }}>Albums & Playlists</h2>
+          <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '24px' }}>
+            {albumResults.map(album => (
+              <div 
+                key={album.id}
+                className="premium-card"
+                onClick={() => onNavigate('album', album)}
+                style={{
+                  minWidth: '200px', maxWidth: '200px', padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', gap: '16px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'}
+              >
+                <img src={album.coverArt} alt={album.title} style={{ width: '100%', aspectRatio: '1/1', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }} />
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{album.title}</h3>
+                  <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{album.artist}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
