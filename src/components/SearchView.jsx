@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Pause, Loader2 } from 'lucide-react';
+import { Search, Play, Pause, Loader2, Heart, Plus } from 'lucide-react';
 
-const MOCK_CATEGORIES = ['All', 'Podcasts', 'Live Events', 'New Releases', 'Pop', 'Hip-Hop'];
+const MOCK_CATEGORIES = ['All', 'Songs', 'Artists', 'Albums', 'Playlists', 'Podcasts'];
 
 const MOCK_RESULTS = [
   {
@@ -30,11 +30,11 @@ const MOCK_RESULTS = [
   }
 ];
 
-const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, globalQuery, setGlobalQuery, onNavigate, searchCache, setSearchCache }) => {
-  const [activeCategory, setActiveCategory] = useState(searchCache.category || 'All');
-  const [songResults, setSongResults] = useState(searchCache.songResults || MOCK_RESULTS);
-  const [artistResults, setArtistResults] = useState(searchCache.artistResults || []);
-  const [albumResults, setAlbumResults] = useState(searchCache.albumResults || []);
+const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, globalQuery, setGlobalQuery, onNavigate, searchCache, setSearchCache, onAddToQueue, likedSongs, toggleLike }) => {
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [songResults, setSongResults] = useState(MOCK_RESULTS);
+  const [artistResults, setArtistResults] = useState([]);
+  const [albumResults, setAlbumResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
   // Helper to decode HTML entities from YouTube API
@@ -52,16 +52,25 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
       return;
     }
 
-    // Check cache
-    if (globalQuery === searchCache.query && activeCategory === searchCache.category && searchCache.songResults.length > 0) {
-      setSongResults(searchCache.songResults);
-      setArtistResults(searchCache.artistResults);
-      setAlbumResults(searchCache.albumResults);
+    const cacheKey = `${globalQuery}-${activeCategory}`;
+
+    // Check unbounded dictionary cache
+    if (searchCache[cacheKey] && searchCache[cacheKey].songResults.length > 0) {
+      setSongResults(searchCache[cacheKey].songResults);
+      setArtistResults(searchCache[cacheKey].artistResults);
+      setAlbumResults(searchCache[cacheKey].albumResults);
       return;
     }
 
-    const timer = setTimeout(async () => {
+    const fetchResults = async () => {
       setIsSearching(true);
+      
+      // Update browser history for deep linking/back button IF not already there
+      const newHash = `#search?q=${encodeURIComponent(globalQuery)}`;
+      if (window.location.hash !== newHash) {
+        window.history.pushState(null, '', newHash);
+      }
+
       try {
         const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
         const q = encodeURIComponent(globalQuery);
@@ -87,17 +96,38 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
         let songItems = [];
         let finalSongs = [];
         if (activeCategory === 'All' || activeCategory === 'Songs' || activeCategory === 'Artists' || activeCategory === 'Profiles') {
-          const res = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=24&q=${q}&type=video&videoCategoryId=10&key=${apiKey}`);
+          const isSpecific = /live|cover|karaoke|instrumental|audio|official/i.test(globalQuery);
+          const searchQ = encodeURIComponent(globalQuery + (isSpecific ? '' : ' official audio'));
+          const res = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=24&q=${searchQ}&type=video&videoCategoryId=10&key=${apiKey}`);
           const data = await res.json();
           songItems = data.items || [];
           
           if (activeCategory === 'All' || activeCategory === 'Songs') {
-            finalSongs = songItems.map(item => ({
+            const rawSongs = songItems.map(item => ({
               id: item.id.videoId, type: 'song',
               title: decodeHTML(item.snippet.title),
               artist: decodeHTML(item.snippet.channelTitle),
+              artistId: item.snippet.channelId,
               coverArt: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url
             }));
+
+            // Deduplicate based on cleaned title to prevent multiple identical versions
+            const seenTitles = new Set();
+            finalSongs = [];
+            for (const track of rawSongs) {
+              const cleanTitle = track.title.toLowerCase()
+                .replace(/\(.*?\)/g, '')
+                .replace(/\[.*?\]/g, '')
+                .replace(/official|video|lyrics|audio|music|live/gi, '')
+                .replace(/[^a-z0-9]/g, '');
+              
+              if (!seenTitles.has(cleanTitle) && cleanTitle.length > 0) {
+                seenTitles.add(cleanTitle);
+                finalSongs.push(track);
+              }
+            }
+            if (finalSongs.length === 0) finalSongs = rawSongs;
+
             setSongResults(finalSongs);
           } else { setSongResults([]); }
         } else { setSongResults([]); }
@@ -124,30 +154,46 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
 
         await albumPromise;
 
-        // Update cache
-        setSearchCache({
-          query: globalQuery,
-          category: activeCategory,
-          songResults: finalSongs,
-          artistResults: finalArtists,
-          albumResults: finalAlbums
-        });
+        // Save to unbounded dictionary cache
+        setSearchCache(prev => ({
+          ...prev,
+          [cacheKey]: {
+            songResults: finalSongs,
+            artistResults: finalArtists,
+            albumResults: finalAlbums
+          }
+        }));
 
       } catch (err) {
         console.error("YouTube Search failed", err);
       } finally {
         setIsSearching(false);
       }
-    }, 600); // 600ms debounce
+    };
 
-    return () => clearTimeout(timer);
+    fetchResults();
   }, [globalQuery, activeCategory]);
 
   return (
     <div className="animate-enter" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '32px', paddingBottom: '60px' }}>
       
       {/* Category Pills */}
-      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '16px', marginBottom: '24px' }}>
+      <div style={{ 
+        display: 'flex', 
+        gap: '12px', 
+        overflowX: 'auto', 
+        paddingTop: '16px',
+        paddingBottom: '16px', 
+        marginBottom: '24px',
+        position: 'sticky',
+        top: '88px', // Clearance for the App.jsx header
+        zIndex: 9,
+        backgroundColor: 'var(--bg-surface)',
+        margin: '-32px -32px 24px -32px', // Pull it out to cover the padding of the parent
+        paddingLeft: '32px',
+        paddingRight: '32px',
+        borderBottom: '1px solid rgba(255,255,255,0.02)'
+      }}>
         {MOCK_CATEGORIES.map(cat => (
           <div 
             key={cat}
@@ -189,7 +235,7 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
           <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column' }}>
             <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '16px' }}>Top result</h2>
             <div 
-              onClick={() => onPlayTrack(songResults[0])}
+              onClick={() => onPlayTrack(songResults[0], [songResults[0]])}
               onMouseEnter={(e) => {
                 e.currentTarget.querySelector('.play-btn-circle').style.opacity = '1';
                 e.currentTarget.querySelector('.play-btn-circle').style.transform = 'translateY(0)';
@@ -224,7 +270,19 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ backgroundColor: 'rgba(0,0,0,0.4)', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: '700' }}>Song</span>
-                  <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{songResults[0].artist}</span>
+                  <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (songResults[0].artistId) {
+                        onNavigate('artist', { id: songResults[0].artistId, title: songResults[0].artist, coverArt: songResults[0].coverArt });
+                      }
+                    }}
+                    style={{ fontSize: '14px', color: 'var(--text-main)', cursor: songResults[0].artistId ? 'pointer' : 'default' }}
+                    onMouseOver={(e) => songResults[0].artistId && (e.currentTarget.style.textDecoration = 'underline')}
+                    onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                  >
+                    {songResults[0].artist}
+                  </span>
                 </div>
               </div>
 
@@ -267,7 +325,7 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
                   <div 
                     key={track.id}
                     className="list-row"
-                    onClick={() => onPlayTrack(track)}
+                    onClick={() => onPlayTrack(track, [track])}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -303,15 +361,32 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
-                      <span style={{ fontSize: '15px', fontWeight: isThisTrackActive ? '600' : '500', color: isThisTrackActive ? '#1ed760' : 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span title={track.title} style={{ fontSize: '15px', fontWeight: isThisTrackActive ? '600' : '500', color: isThisTrackActive ? '#1ed760' : 'var(--text-main)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {track.title}
                       </span>
-                      <span style={{ fontSize: '14px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span 
+                        title={track.artist} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (track.artistId) {
+                            onNavigate('artist', { id: track.artistId, title: track.artist, coverArt: track.coverArt });
+                          }
+                        }}
+                        style={{ fontSize: '14px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: track.artistId ? 'pointer' : 'default' }}
+                        onMouseOver={(e) => track.artistId && (e.currentTarget.style.textDecoration = 'underline')}
+                        onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                      >
                         {track.artist}
                       </span>
                     </div>
-                    <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-                      3:45
+                    <div className="row-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div onClick={(e) => { e.stopPropagation(); toggleLike(track); }} style={{ cursor: 'pointer', padding: '4px', opacity: 0.7 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>
+                        <Heart size={16} fill={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'none'} color={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'var(--text-muted)'} />
+                      </div>
+                      <div onClick={(e) => { e.stopPropagation(); onAddToQueue(track); }} style={{ cursor: 'pointer', padding: '4px', opacity: 0.7 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>
+                        <Plus size={18} color="var(--text-muted)" />
+                      </div>
+                      <span style={{ fontSize: '14px', color: 'var(--text-muted)', width: '32px', textAlign: 'right' }}>3:45</span>
                     </div>
                   </div>
                 );
@@ -350,7 +425,7 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
                     gap: '16px',
                     backgroundColor: 'transparent'
                   }}
-                  onClick={() => onPlayTrack(track)}
+                  onClick={() => onPlayTrack(track, [track])}
                   onMouseEnter={(e) => {
                     e.currentTarget.querySelector('.play-btn-circle').style.opacity = '1';
                     e.currentTarget.querySelector('.play-btn-circle').style.transform = 'translateY(0)';
@@ -394,10 +469,21 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
                   </div>
 
                   <div>
-                    <h3 style={{ fontSize: '15px', fontWeight: '500', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <h3 title={track.title} style={{ fontSize: '15px', fontWeight: '500', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {track.title}
                     </h3>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <p 
+                      title={track.artist} 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (track.artistId) {
+                          onNavigate('artist', { id: track.artistId, title: track.artist, coverArt: track.coverArt });
+                        }
+                      }}
+                      style={{ fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: track.artistId ? 'pointer' : 'default', margin: 0 }}
+                      onMouseOver={(e) => track.artistId && (e.currentTarget.style.textDecoration = 'underline')}
+                      onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                    >
                       {track.artist}
                     </p>
                   </div>

@@ -1,6 +1,6 @@
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, List, Mic2 } from 'lucide-react';
 
-const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, volume, onVolumeChange }) => {
+const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, volume, onVolumeChange, onNext, onPrev, onShuffle, onRepeat, isShuffle, isRepeat, onOpenQueue, onOpenLyrics }) => {
   const containerStyle = {
     display: 'flex',
     alignItems: 'center',
@@ -131,8 +131,8 @@ const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, vo
       {/* Controls */}
       <div style={controlsContainerStyle}>
         <div style={buttonsStyle}>
-          <button style={iconBtnStyle} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}><Shuffle size={16} /></button>
-          <button style={iconBtnStyle} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}><SkipBack size={20} fill="currentColor" /></button>
+          <button style={{...iconBtnStyle, color: isShuffle ? '#1ed760' : 'var(--text-muted)'}} onClick={onShuffle} onMouseEnter={(e) => !isShuffle && (e.currentTarget.style.color = 'var(--text-main)')} onMouseLeave={(e) => !isShuffle && (e.currentTarget.style.color = 'var(--text-muted)')}><Shuffle size={16} /></button>
+          <button style={iconBtnStyle} onClick={onPrev} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}><SkipBack size={20} fill="currentColor" /></button>
           
           <button 
             style={playBtnStyle} 
@@ -147,8 +147,8 @@ const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, vo
             )}
           </button>
           
-          <button style={iconBtnStyle} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}><SkipForward size={20} fill="currentColor" /></button>
-          <button style={iconBtnStyle} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}><Repeat size={16} /></button>
+          <button style={iconBtnStyle} onClick={onNext} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}><SkipForward size={20} fill="currentColor" /></button>
+          <button style={{...iconBtnStyle, color: isRepeat ? '#1ed760' : 'var(--text-muted)'}} onClick={onRepeat} onMouseEnter={(e) => !isRepeat && (e.currentTarget.style.color = 'var(--text-main)')} onMouseLeave={(e) => !isRepeat && (e.currentTarget.style.color = 'var(--text-muted)')}><Repeat size={16} /></button>
         </div>
         <div style={progressBarStyle}>
           <span>{formatTime(progress)}</span>
@@ -166,6 +166,13 @@ const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, vo
 
       {/* Extra */}
       <div style={extraControlsStyle}>
+        <button style={iconBtnStyle} onClick={onOpenLyrics} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}>
+          <Mic2 size={16} />
+        </button>
+        <button style={iconBtnStyle} onClick={onOpenQueue} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}>
+          <List size={16} />
+        </button>
+        
         {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
         
         <div style={{ width: '80px', height: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', cursor: 'pointer', padding: '4px 0', position: 'relative' }} onClick={handleVolumeClick}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, Clock, ArrowLeft } from 'lucide-react';
+import { Play, Pause, Clock, ArrowLeft, Heart, Plus } from 'lucide-react';
 
-const ArtistView = ({ context, currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onBack }) => {
+const ArtistView = ({ context, currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onBack, onAddToQueue, likedSongs, toggleLike }) => {
   const [tracks, setTracks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -102,7 +102,7 @@ const ArtistView = ({ context, currentTrack, isPlaying: globalIsPlaying, onPlayT
             cursor: 'pointer',
             transition: 'transform 0.2s ease',
           }}
-          onClick={() => { if(tracks.length > 0) onPlayTrack(tracks[0]) }}
+          onClick={() => { if(tracks.length > 0) onPlayTrack(tracks[0], tracks) }}
           onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
           onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
@@ -125,7 +125,7 @@ const ArtistView = ({ context, currentTrack, isPlaying: globalIsPlaying, onPlayT
               return (
                 <div 
                   key={track.id}
-                  onClick={() => onPlayTrack(track)}
+                  onClick={() => onPlayTrack(track, tracks)}
                   style={{
                     display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer',
                     transition: 'background-color 0.2s ease', backgroundColor: 'transparent'
@@ -148,8 +148,14 @@ const ArtistView = ({ context, currentTrack, isPlaying: globalIsPlaying, onPlayT
                     </div>
                   </div>
 
-                  <div style={{ width: '48px', textAlign: 'right', fontSize: '14px', color: 'var(--text-muted)' }}>
-                    --:--
+                  <div className="row-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div onClick={(e) => { e.stopPropagation(); toggleLike(track); }} style={{ cursor: 'pointer', padding: '4px', opacity: 0.7 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>
+                      <Heart size={16} fill={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'none'} color={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'var(--text-muted)'} />
+                    </div>
+                    <div onClick={(e) => { e.stopPropagation(); onAddToQueue(track); }} style={{ cursor: 'pointer', padding: '4px', opacity: 0.7 }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>
+                      <Plus size={18} color="var(--text-muted)" />
+                    </div>
+                    <span style={{ fontSize: '14px', color: 'var(--text-muted)', width: '32px', textAlign: 'right' }}>--:--</span>
                   </div>
                 </div>
               );

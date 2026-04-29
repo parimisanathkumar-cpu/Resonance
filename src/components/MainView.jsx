@@ -1,4 +1,4 @@
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Heart, Plus } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 // MOCK DATA FOR DISCOVER DASHBOARD
@@ -19,7 +19,7 @@ const MADE_FOR_YOU = [
   { id: 'mix5', title: 'Focus Flow', desc: 'Deep focus instrumental beats', coverArt: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80' }
 ];
 
-const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) => {
+const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onAddToQueue, likedSongs, toggleLike }) => {
   const [greeting, setGreeting] = useState('');
 
   useEffect(() => {
@@ -45,6 +45,10 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) => 
           {greeting}
         </h1>
 
+        <style>{`
+          .recent-card:hover .row-actions { opacity: 1 !important; }
+        `}</style>
+
         {/* Top 6 Recent Plays (Blocky layout) */}
         <div style={{
           display: 'grid',
@@ -59,7 +63,8 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) => 
             return (
               <div 
                 key={track.id}
-                onClick={() => onPlayTrack(track)}
+                className="recent-card"
+                onClick={() => onPlayTrack(track, [track])}
                 style={{
                   display: 'flex', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)',
                   borderRadius: '4px', cursor: 'pointer', overflow: 'hidden',
@@ -78,6 +83,15 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack }) => 
                 <h3 style={{ fontSize: '15px', fontWeight: '600', padding: '0 16px', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {track.title}
                 </h3>
+                
+                <div className="row-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '64px', transition: 'opacity 0.2s', opacity: 0 }}>
+                  <div onClick={(e) => { e.stopPropagation(); toggleLike(track); }} style={{ cursor: 'pointer', padding: '4px' }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.1)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
+                    <Heart size={16} fill={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'none'} color={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'var(--text-muted)'} />
+                  </div>
+                  <div onClick={(e) => { e.stopPropagation(); onAddToQueue(track); }} style={{ cursor: 'pointer', padding: '4px' }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.1)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
+                    <Plus size={18} color="var(--text-muted)" />
+                  </div>
+                </div>
                 
                 {/* Play Button Overlay */}
                 <div 
