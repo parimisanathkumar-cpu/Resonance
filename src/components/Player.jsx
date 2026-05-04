@@ -108,9 +108,9 @@ const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, vo
   const progressPercent = duration ? (progress / duration) * 100 : 0;
 
   return (
-    <div style={containerStyle}>
+    <div className="player-container" style={containerStyle}>
       {/* Track Info */}
-      <div style={trackInfoStyle}>
+      <div className="player-track-info" style={trackInfoStyle}>
         {track ? (
           <>
             <img 
@@ -129,7 +129,7 @@ const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, vo
       </div>
 
       {/* Controls */}
-      <div style={controlsContainerStyle}>
+      <div className="player-controls" style={controlsContainerStyle}>
         <div style={buttonsStyle}>
           <button style={{...iconBtnStyle, color: isShuffle ? '#1ed760' : 'var(--text-muted)'}} onClick={onShuffle} onMouseEnter={(e) => !isShuffle && (e.currentTarget.style.color = 'var(--text-main)')} onMouseLeave={(e) => !isShuffle && (e.currentTarget.style.color = 'var(--text-muted)')}><Shuffle size={16} /></button>
           <button style={iconBtnStyle} onClick={onPrev} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}><SkipBack size={20} fill="currentColor" /></button>
@@ -150,7 +150,7 @@ const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, vo
           <button style={iconBtnStyle} onClick={onNext} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}><SkipForward size={20} fill="currentColor" /></button>
           <button style={{...iconBtnStyle, color: isRepeat ? '#1ed760' : 'var(--text-muted)'}} onClick={onRepeat} onMouseEnter={(e) => !isRepeat && (e.currentTarget.style.color = 'var(--text-main)')} onMouseLeave={(e) => !isRepeat && (e.currentTarget.style.color = 'var(--text-muted)')}><Repeat size={16} /></button>
         </div>
-        <div style={progressBarStyle}>
+        <div className="player-progress" style={progressBarStyle}>
           <span>{formatTime(progress)}</span>
           
           <div style={sliderTrackStyle} onClick={handleSeekClick}>
@@ -165,7 +165,7 @@ const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, vo
       </div>
 
       {/* Extra */}
-      <div style={extraControlsStyle}>
+      <div className="player-extra" style={extraControlsStyle}>
         <button style={iconBtnStyle} onClick={onOpenLyrics} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}>
           <Mic2 size={16} />
         </button>

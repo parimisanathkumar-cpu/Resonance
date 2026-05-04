@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Bell, X } from 'lucide-react';
+import { Search, Bell, X, Home, Library, Heart } from 'lucide-react';
 import './App.css';
 import Sidebar from './components/Sidebar';
 import MainView from './components/MainView';
@@ -440,59 +440,11 @@ function App() {
   };
 
   /* ----- Styling below remains the same minimal aesthetic ----- */
-  const containerStyle = {
-    display: 'flex',
-    height: '100vh',
-    width: '100vw',
-    padding: '16px',
-    gap: '16px',
-    boxSizing: 'border-box',
-    position: 'relative',
-  };
-
-  const navSectionStyle = {
-    width: '240px',
-    height: 'calc(100% - 90px)',
-    display: 'flex',
-    flexDirection: 'column',
-    borderRadius: '16px',
-    overflow: 'hidden',
-    backgroundColor: 'var(--bg-surface)',
-    border: '1px solid var(--border-glass)'
-  };
-
-  const mainSectionStyle = {
-    flex: 1,
-    height: 'calc(100% - 90px)',
-    borderRadius: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    overflowY: 'auto',
-    backgroundColor: 'var(--bg-surface)',
-    border: '1px solid var(--border-glass)'
-  };
-
-  const floatingPlayerStyle = {
-    position: 'absolute',
-    bottom: '16px',
-    left: '16px',
-    right: '16px',
-    height: '80px',
-    borderRadius: '16px',
-    zIndex: 1000,
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 24px',
-    backgroundColor: 'var(--bg-glass)',
-    backdropFilter: 'blur(32px)',
-    WebkitBackdropFilter: 'blur(32px)',
-    border: '1px solid var(--border-glass)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
-  };
+  // Inline styles removed in favor of index.css classes for responsiveness
 
   return (
-    <div style={containerStyle}>
-      <aside style={navSectionStyle}>
+    <div className="app-container">
+      <aside className="app-sidebar">
         <Sidebar 
           activeTab={activeTab} 
           onTabChange={(tab) => {
@@ -512,9 +464,9 @@ function App() {
         />
       </aside>
 
-      <main style={mainSectionStyle}>
+      <main className="app-main">
         {/* Persistent Top Header */}
-        <header style={{ 
+        <header className="app-header" style={{ 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'space-between', 
@@ -527,7 +479,7 @@ function App() {
           zIndex: 10
         }}>
           {/* Omni Search Bar */}
-          <div style={{ position: 'relative', width: '420px' }}>
+          <div className="search-input-container" style={{ position: 'relative', width: '420px' }}>
             <Search size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
             <input 
               type="text" 
@@ -721,7 +673,7 @@ function App() {
         )}
       </main>
 
-      <div className="animate-enter" style={floatingPlayerStyle}>
+      <div className="animate-enter floating-player">
         <Player 
           track={currentTrack} 
           isPlaying={isPlaying}
@@ -746,6 +698,31 @@ function App() {
             setActiveTab('lyrics');
           }}
         />
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="app-bottom-nav">
+        <div 
+          onClick={() => { window.history.pushState(null, '', '#discover'); setActiveTab('discover'); }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', color: activeTab === 'discover' ? '#1ed760' : 'var(--text-muted)' }}
+        >
+          <Home size={24} strokeWidth={activeTab === 'discover' ? 2.5 : 2} />
+          <span style={{ fontSize: '10px', fontWeight: '500' }}>Home</span>
+        </div>
+        <div 
+          onClick={() => { window.history.pushState(null, '', '#search'); setActiveTab('search'); }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', color: activeTab === 'search' ? '#1ed760' : 'var(--text-muted)' }}
+        >
+          <Search size={24} strokeWidth={activeTab === 'search' ? 2.5 : 2} />
+          <span style={{ fontSize: '10px', fontWeight: '500' }}>Search</span>
+        </div>
+        <div 
+          onClick={() => { window.history.pushState(null, '', '#favorites'); setActiveTab('favorites'); }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', color: activeTab === 'favorites' ? '#1ed760' : 'var(--text-muted)' }}
+        >
+          <Library size={24} strokeWidth={activeTab === 'favorites' ? 2.5 : 2} />
+          <span style={{ fontSize: '10px', fontWeight: '500' }}>Library</span>
+        </div>
       </div>
 
       <YoutubePlayerManager 

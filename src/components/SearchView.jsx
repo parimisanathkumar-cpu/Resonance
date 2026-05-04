@@ -178,7 +178,7 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
     <div className="animate-enter" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '32px', paddingBottom: '60px' }}>
       
       {/* Category Pills */}
-      <div style={{ 
+      <div className="category-pills" style={{ 
         display: 'flex', 
         gap: '12px', 
         overflowX: 'auto', 
@@ -189,9 +189,6 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
         top: '88px', // Clearance for the App.jsx header
         zIndex: 9,
         backgroundColor: 'var(--bg-surface)',
-        margin: '-32px -32px 24px -32px', // Pull it out to cover the padding of the parent
-        paddingLeft: '32px',
-        paddingRight: '32px',
         borderBottom: '1px solid rgba(255,255,255,0.02)'
       }}>
         {MOCK_CATEGORIES.map(cat => (
