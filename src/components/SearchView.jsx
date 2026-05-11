@@ -111,6 +111,33 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
               coverArt: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url
             }));
 
+            // Score and sort rawSongs by heuristic before deduplicating
+            const isUserQuerySpecific = /live|cover|karaoke|instrumental|remix|acoustic/i.test(globalQuery);
+
+            rawSongs.sort((a, b) => {
+              const scoreTrack = (title, channel) => {
+                let score = 0;
+                const t = title.toLowerCase();
+                const c = channel.toLowerCase();
+                
+                // Prefer auto-generated official music channels
+                if (c.includes('- topic') || c.includes('vevo')) score += 50;
+                
+                // Prefer official flags
+                if (t.includes('official audio') || t.includes('official music video')) score += 20;
+                else if (t.includes('official')) score += 10;
+                
+                // Filter out non-original versions unless requested
+                if (!isUserQuerySpecific) {
+                  if (/cover|karaoke|instrumental|live|reaction|8d|slowed|reverb|remix|acoustic/i.test(t)) score -= 100;
+                  if (t.includes('lyric')) score -= 10;
+                }
+                return score;
+              };
+
+              return scoreTrack(b.title, b.artist) - scoreTrack(a.title, a.artist);
+            });
+
             // Deduplicate based on cleaned title to prevent multiple identical versions
             const seenTitles = new Set();
             finalSongs = [];
@@ -175,7 +202,7 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
   }, [globalQuery, activeCategory]);
 
   return (
-    <div className="animate-enter" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '32px', paddingBottom: '60px' }}>
+    <div className="animate-enter" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', padding: '32px', paddingBottom: '60px' }}>
       
       {/* Category Pills */}
       <div className="category-pills" style={{ 
@@ -186,7 +213,6 @@ const SearchView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, glo
         paddingBottom: '16px', 
         marginBottom: '24px',
         position: 'sticky',
-        top: '88px', // Clearance for the App.jsx header
         zIndex: 9,
         backgroundColor: 'var(--bg-surface)',
         borderBottom: '1px solid rgba(255,255,255,0.02)'
