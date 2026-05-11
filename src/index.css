@@ -74,6 +74,7 @@ body {
   margin: -32px -32px 24px -32px;
   padding-left: 32px;
   padding-right: 32px;
+  top: 89px;
 }
 
 /* Application Layout */
@@ -193,6 +194,7 @@ body {
     margin: -16px -16px 24px -16px !important;
     padding-left: 16px !important;
     padding-right: 16px !important;
+    top: 73px !important;
   }
 
   /* Player Mobile Adjustments */
