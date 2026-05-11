@@ -72,11 +72,21 @@ const Sidebar = ({ activeTab, onTabChange }) => {
 
       <div style={sectionDivider} />
       
-      <div style={navItemStyle} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}>
+      <div 
+        style={activeTab === 'library' ? activeNavItemStyle : navItemStyle} 
+        onClick={() => onTabChange('library')}
+        onMouseEnter={(e) => activeTab !== 'library' && (e.currentTarget.style.color = 'var(--text-main)')} 
+        onMouseLeave={(e) => activeTab !== 'library' && (e.currentTarget.style.color = 'var(--text-muted)')}
+      >
         <Library size={20} strokeWidth={1.5} />
         <span>Library</span>
       </div>
-      <div style={navItemStyle} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}>
+      <div 
+        style={activeTab === 'favorites' ? activeNavItemStyle : navItemStyle} 
+        onClick={() => onTabChange('favorites')}
+        onMouseEnter={(e) => activeTab !== 'favorites' && (e.currentTarget.style.color = 'var(--text-main)')} 
+        onMouseLeave={(e) => activeTab !== 'favorites' && (e.currentTarget.style.color = 'var(--text-muted)')}
+      >
         <FolderHeart size={20} strokeWidth={1.5} />
         <span>Favorites</span>
       </div>

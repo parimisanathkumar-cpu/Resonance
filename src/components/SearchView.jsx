@@ -46,7 +46,7 @@ const SearchView = ({
   onNavigate,
   searchCache,
   setSearchCache,
-  onAddToQueue,
+  onOpenPlaylistModal,
   likedSongs,
   toggleLike,
 }) => {
@@ -105,7 +105,7 @@ const SearchView = ({
         ) {
           const albumQ = encodeURIComponent(globalQuery + " album");
           albumPromise = fetch(
-            `https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=8&q=${albumQ}&type=playlist&key=${apiKey}`,
+            `http://localhost:8000/api/search?q=${albumQ}&type=playlist&maxResults=8`,
           )
             .then((res) => res.json())
             .then((data) =>
@@ -145,7 +145,7 @@ const SearchView = ({
             globalQuery + (isSpecific ? "" : " official audio"),
           );
           const res = await fetch(
-            `https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=24&q=${searchQ}&type=video&videoCategoryId=10&key=${apiKey}`,
+            `http://localhost:8000/api/search?q=${searchQ}&type=video&videoCategoryId=10&maxResults=24`,
           );
           const data = await res.json();
           songItems = data.items || [];
@@ -174,18 +174,24 @@ const SearchView = ({
                 const t = title.toLowerCase();
                 const c = channel.toLowerCase();
 
-                // Prefer auto-generated official music channels
-                if (c.includes("- topic") || c.includes("vevo")) score += 50;
+                // 1. Topic channels are auto-generated official audio (embeddable)
+                if (c.includes("- topic")) score += 100;
+                
+                // VEVO and official videos are often blocked on localhost, but still better than covers
+                if (c.includes("vevo")) score += 10;
 
-                // Prefer official flags
-                if (
-                  t.includes("official audio") ||
-                  t.includes("official music video")
-                )
-                  score += 20;
+                // 2. Verified artist heuristic (if channel matches query, it's likely official)
+                const queryWords = globalQuery.toLowerCase().split(/\s+/);
+                const channelHasQuery = queryWords.some(w => w.length > 2 && c.includes(w));
+                if (channelHasQuery && !c.includes("vevo") && !c.includes("- topic")) score += 20;
+
+                // 3. Audio > Video to prevent 150 errors
+                if (t.includes("official audio")) score += 50;
                 else if (t.includes("official")) score += 10;
+                
+                if (t.includes("music video") || t.includes("official video")) score -= 30;
 
-                // Filter out non-original versions unless requested
+                // 4. Filter out non-original versions unless requested
                 if (!isUserQuerySpecific) {
                   if (
                     /cover|karaoke|instrumental|live|reaction|8d|slowed|reverb|remix|acoustic/i.test(
@@ -716,7 +722,7 @@ const SearchView = ({
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
-                          onAddToQueue(track);
+                          if (onOpenPlaylistModal) onOpenPlaylistModal(track);
                         }}
                         style={{
                           cursor: "pointer",
@@ -881,37 +887,69 @@ const SearchView = ({
                     >
                       {track.title}
                     </h3>
-                    <p
-                      title={track.artist}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (track.artistId) {
-                          onNavigate("artist", {
-                            id: track.artistId,
-                            title: track.artist,
-                            coverArt: track.coverArt,
-                          });
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                      <p
+                        title={track.artist}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (track.artistId) {
+                            onNavigate("artist", {
+                              id: track.artistId,
+                              title: track.artist,
+                              coverArt: track.coverArt,
+                            });
+                          }
+                        }}
+                        style={{
+                          fontSize: "13px",
+                          color: "var(--text-muted)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          cursor: track.artistId ? "pointer" : "default",
+                          margin: 0,
+                          flex: 1,
+                        }}
+                        onMouseOver={(e) =>
+                          track.artistId &&
+                          (e.currentTarget.style.textDecoration = "underline")
                         }
-                      }}
-                      style={{
-                        fontSize: "13px",
-                        color: "var(--text-muted)",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        cursor: track.artistId ? "pointer" : "default",
-                        margin: 0,
-                      }}
-                      onMouseOver={(e) =>
-                        track.artistId &&
-                        (e.currentTarget.style.textDecoration = "underline")
-                      }
-                      onMouseOut={(e) =>
-                        (e.currentTarget.style.textDecoration = "none")
-                      }
-                    >
-                      {track.artist}
-                    </p>
+                        onMouseOut={(e) =>
+                          (e.currentTarget.style.textDecoration = "none")
+                        }
+                      >
+                        {track.artist}
+                      </p>
+                      
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLike(track);
+                          }}
+                          style={{ cursor: "pointer", opacity: 0.7 }}
+                          onMouseOver={(e) => (e.currentTarget.style.opacity = 1)}
+                          onMouseOut={(e) => (e.currentTarget.style.opacity = 0.7)}
+                        >
+                          <Heart
+                            size={16}
+                            fill={(likedSongs || []).some((t) => t.id === track.id) ? "#1ed760" : "none"}
+                            color={(likedSongs || []).some((t) => t.id === track.id) ? "#1ed760" : "var(--text-muted)"}
+                          />
+                        </div>
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenPlaylistModal) onOpenPlaylistModal(track);
+                          }}
+                          style={{ cursor: "pointer", opacity: 0.7 }}
+                          onMouseOver={(e) => (e.currentTarget.style.opacity = 1)}
+                          onMouseOut={(e) => (e.currentTarget.style.opacity = 0.7)}
+                        >
+                          <Plus size={18} color="var(--text-muted)" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

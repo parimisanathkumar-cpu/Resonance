@@ -9,6 +9,9 @@ import ArtistView from './components/ArtistView';
 import QueueView from './components/QueueView';
 import FavoritesView from './components/FavoritesView';
 import LyricsView from './components/LyricsView';
+import LibraryView from './components/LibraryView';
+import PlaylistView from './components/PlaylistView';
+import PlaylistModal from './components/PlaylistModal';
 import Player from './components/Player';
 import YoutubePlayerManager from './components/YoutubePlayerManager';
 
@@ -59,6 +62,10 @@ function App() {
   const [isRepeat, setIsRepeat] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(true);
 
+  // Playlist Modal State
+  const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
+  const [playlistModalTrack, setPlaylistModalTrack] = useState(null);
+
   // Refs for stable callbacks
   const queueRef = useRef([]);
   const queueIndexRef = useRef(-1);
@@ -75,25 +82,50 @@ function App() {
   useEffect(() => { isAutoplayRef.current = isAutoplay; }, [isAutoplay]);
   useEffect(() => { progressRef.current = progress; }, [progress]);
 
-  // Local Storage
-  const [likedSongs, setLikedSongs] = useState(() => {
-    try {
-      const saved = localStorage.getItem('resonance_liked');
-      if (saved) return JSON.parse(saved);
-    } catch(e) {}
-    return [];
-  });
+  // Backend API Integration
+  const API_BASE_URL = 'http://localhost:8000/api';
+  const [likedSongs, setLikedSongs] = useState([]);
 
   useEffect(() => {
-    localStorage.setItem('resonance_liked', JSON.stringify(likedSongs));
-  }, [likedSongs]);
+    fetch(`${API_BASE_URL}/favorites/`)
+      .then(res => res.json())
+      .then(data => {
+        // Map backend TrackResponse format to frontend track format
+        const mappedData = data.map(t => ({
+          id: t.track_id,
+          type: 'song',
+          title: t.title,
+          artist: t.artist,
+          coverArt: t.cover_art
+        }));
+        setLikedSongs(mappedData);
+      })
+      .catch(err => console.error("Failed to load favorites", err));
+  }, []);
 
-  const toggleLike = useCallback((track) => {
+  const toggleLike = useCallback(async (track) => {
+    // Optimistic UI update
     setLikedSongs(prev => {
       const exists = prev.find(t => t.id === track.id);
       if (exists) return prev.filter(t => t.id !== track.id);
       return [...prev, track];
     });
+
+    // Backend sync
+    try {
+      await fetch(`${API_BASE_URL}/favorites/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          track_id: track.id,
+          title: track.title,
+          artist: track.artist,
+          cover_art: track.coverArt
+        })
+      });
+    } catch (e) {
+      console.error("Failed to toggle favorite", e);
+    }
   }, []);
 
   // Player Controls
@@ -155,35 +187,31 @@ function App() {
   }, []);
 
   const handlePlayTrack = useCallback((track, contextQueue = null) => {
-    setCurrentTrack(prev => {
-      if (prev?.id === track.id) {
-        setIsPlaying(p => {
-          const newVal = !p;
-          if (playerRef.current) {
-            if (newVal) playerRef.current.playVideo();
-            else playerRef.current.pauseVideo();
-          }
-          return newVal;
-        });
-        return prev;
-      }
-
-      if (contextQueue && contextQueue.length > 0) {
-        setQueue(contextQueue);
-        const idx = contextQueue.findIndex(t => t.id === track.id);
-        setQueueIndex(idx !== -1 ? idx : 0);
+    if (currentTrack?.id === track.id) {
+      if (isPlaying) {
+        if (playerRef.current) playerRef.current.pauseVideo();
+        setIsPlaying(false);
       } else {
-        setQueue([track]);
-        setQueueIndex(0);
+        if (playerRef.current) playerRef.current.playVideo();
+        setIsPlaying(true);
       }
+      return;
+    }
 
-      setIsPlaying(true);
-      setProgress(0);
-      if (playerRef.current?.loadVideoById) playerRef.current.loadVideoById(track.id);
+    if (contextQueue && contextQueue.length > 0) {
+      setQueue(contextQueue);
+      const idx = contextQueue.findIndex(t => t.id === track.id);
+      setQueueIndex(idx !== -1 ? idx : 0);
+    } else {
+      setQueue([track]);
+      setQueueIndex(0);
+    }
 
-      return track;
-    });
-  }, []);
+    setCurrentTrack(track);
+    setIsPlaying(true);
+    setProgress(0);
+    if (playerRef.current?.loadVideoById) playerRef.current.loadVideoById(track.id);
+  }, [currentTrack, isPlaying]);
 
   const handleYoutubeReady = useCallback((event) => {
     playerRef.current = event.target;
@@ -246,6 +274,12 @@ function App() {
         if (params.get('id')) setActiveContext({ id: params.get('id'), title: decodeURIComponent(params.get('title') || ''), artist: decodeURIComponent(params.get('artist') || ''), coverArt: decodeURIComponent(params.get('cover') || '') });
       } else if (hash === '#queue') setActiveTab('queue');
       else if (hash === '#favorites') setActiveTab('favorites');
+      else if (hash === '#library') setActiveTab('library');
+      else if (hash.startsWith('#playlist')) {
+        setActiveTab('playlist');
+        const params = new URLSearchParams(hash.split('?')[1]);
+        if (params.get('id')) setActiveContext({ id: params.get('id'), title: decodeURIComponent(params.get('title') || '') });
+      }
       else if (hash === '#lyrics') setActiveTab('lyrics');
     };
     window.addEventListener('popstate', handlePopState);
@@ -336,14 +370,23 @@ function App() {
           <div style={{ padding: '8px', cursor: 'pointer', color: 'var(--text-muted)' }}><Bell size={20} /></div>
         </header>
 
-        {activeTab === 'discover' && <MainView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onAddToQueue={(t) => setQueue(q => [...q, t])} likedSongs={likedSongs} toggleLike={toggleLike} />}
-        {activeTab === 'search' && <SearchView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} globalQuery={globalQuery} setGlobalQuery={setGlobalQuery} searchCache={searchCache} setSearchCache={setSearchCache} onAddToQueue={(t) => setQueue(q => [...q, t])} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
-        {activeTab === 'album' && <AlbumView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onAddToQueue={(t) => setQueue(q => [...q, t])} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
-        {activeTab === 'artist' && <ArtistView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onAddToQueue={(t) => setQueue(q => [...q, t])} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); }} onBack={() => window.history.back()} />}
+        {activeTab === 'discover' && <MainView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} />}
+        {activeTab === 'search' && <SearchView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} globalQuery={globalQuery} setGlobalQuery={setGlobalQuery} searchCache={searchCache} setSearchCache={setSearchCache} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
+        {activeTab === 'album' && <AlbumView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
+        {activeTab === 'artist' && <ArtistView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); }} onBack={() => window.history.back()} />}
         {activeTab === 'queue' && <QueueView queue={queue} queueIndex={queueIndex} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} removeFromQueue={(idx) => setQueue(q => q.filter((_, i) => i !== idx))} reorderQueue={(s, d) => setQueue(q => { const n = [...q]; const [r] = n.splice(s, 1); n.splice(d, 0, r); return n; })} isAutoplay={isAutoplay} setIsAutoplay={setIsAutoplay} />}
         {activeTab === 'favorites' && <FavoritesView likedSongs={likedSongs} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} toggleLike={toggleLike} />}
+        {activeTab === 'library' && <LibraryView onPlayTrack={handlePlayTrack} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
+        {activeTab === 'playlist' && <PlaylistView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
         {activeTab === 'lyrics' && <LyricsView currentTrack={currentTrack} progress={progress} />}
       </main>
+
+      <PlaylistModal 
+        isOpen={playlistModalOpen} 
+        onClose={() => setPlaylistModalOpen(false)} 
+        track={playlistModalTrack} 
+        onAddToQueue={(t) => setQueue(q => [...q, t])} 
+      />
 
       <div className="animate-enter floating-player">
         <Player track={currentTrack} isPlaying={isPlaying} onTogglePlay={() => handlePlayTrack(currentTrack)} progress={progress} duration={duration} onSeek={(t) => playerRef.current?.seekTo(t, true)} volume={volume} onVolumeChange={setVolume} onNext={playNext} onPrev={playPrev} onShuffle={() => setIsShuffle(!isShuffle)} onRepeat={() => setIsRepeat(!isRepeat)} isShuffle={isShuffle} isRepeat={isRepeat} onOpenQueue={() => { window.history.pushState(null, '', '#queue'); setActiveTab('queue'); }} onOpenLyrics={() => { window.history.pushState(null, '', '#lyrics'); setActiveTab('lyrics'); }} />
@@ -352,7 +395,7 @@ function App() {
       <div className="app-bottom-nav">
         <div onClick={() => { window.history.pushState(null, '', '#discover'); setActiveTab('discover'); }} style={{ color: activeTab === 'discover' ? '#1ed760' : 'var(--text-muted)' }}><Home size={24} /></div>
         <div onClick={() => { window.history.pushState(null, '', '#search'); setActiveTab('search'); }} style={{ color: activeTab === 'search' ? '#1ed760' : 'var(--text-muted)' }}><Search size={24} /></div>
-        <div onClick={() => { window.history.pushState(null, '', '#favorites'); setActiveTab('favorites'); }} style={{ color: activeTab === 'favorites' ? '#1ed760' : 'var(--text-muted)' }}><Library size={24} /></div>
+        <div onClick={() => { window.history.pushState(null, '', '#library'); setActiveTab('library'); }} style={{ color: activeTab === 'library' || activeTab === 'favorites' ? '#1ed760' : 'var(--text-muted)' }}><Library size={24} /></div>
       </div>
 
       <YoutubePlayerManager onReady={handleYoutubeReady} onStateChange={handleYoutubeStateChange} onError={handleYoutubeError} />

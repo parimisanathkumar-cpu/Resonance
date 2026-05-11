@@ -19,7 +19,7 @@ const MADE_FOR_YOU = [
   { id: 'mix5', title: 'Focus Flow', desc: 'Deep focus instrumental beats', coverArt: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80' }
 ];
 
-const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onAddToQueue, likedSongs, toggleLike }) => {
+const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpenPlaylistModal, likedSongs, toggleLike }) => {
   const [greeting, setGreeting] = useState('');
 
   useEffect(() => {
@@ -88,7 +88,7 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onAdd
                   <div onClick={(e) => { e.stopPropagation(); toggleLike(track); }} style={{ cursor: 'pointer', padding: '4px' }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.1)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
                     <Heart size={16} fill={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'none'} color={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'var(--text-muted)'} />
                   </div>
-                  <div onClick={(e) => { e.stopPropagation(); onAddToQueue(track); }} style={{ cursor: 'pointer', padding: '4px' }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.1)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
+                  <div onClick={(e) => { e.stopPropagation(); onOpenPlaylistModal(track); }} style={{ cursor: 'pointer', padding: '4px' }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.1)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
                     <Plus size={18} color="var(--text-muted)" />
                   </div>
                 </div>
