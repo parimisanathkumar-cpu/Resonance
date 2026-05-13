@@ -110,6 +110,85 @@ body {
   border: 1px solid var(--border-glass);
 }
 
+/* MOBILE RESPONSIVENESS */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 0;
+    gap: 0;
+    flex-direction: column;
+  }
+  
+  .app-sidebar {
+    width: 100%;
+    height: 60px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    flex-direction: row;
+    border-radius: 0;
+    border: none;
+    border-top: 1px solid var(--border-glass);
+    background-color: rgba(18, 18, 22, 0.95);
+    backdrop-filter: blur(12px);
+  }
+
+  .app-main {
+    height: calc(100vh - 60px);
+    border-radius: 0;
+    border: none;
+  }
+  
+  /* Make the header padding smaller on mobile */
+  .app-header {
+    padding: 16px !important;
+  }
+  
+  /* Make search input full width on mobile */
+  .search-input-container {
+    width: 100% !important;
+  }
+  
+  /* Bottom padding for lists so they don't get hidden behind player/nav */
+  .animate-enter {
+    padding-bottom: 160px !important;
+  }
+
+  .floating-player {
+    bottom: 76px !important; /* 60px nav + 16px padding */
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+  }
+  
+  .mobile-hide {
+    display: none !important;
+  }
+  
+
+  
+  .app-sidebar > div {
+    display: flex;
+    flex-direction: row !important;
+    justify-content: space-around;
+    padding: 0 !important;
+    height: 100%;
+  }
+  
+  .mobile-nav-item {
+    flex-direction: column !important;
+    gap: 4px !important;
+    padding: 8px 0 !important;
+    flex: 1;
+    justify-content: center;
+    border-radius: 0 !important;
+  }
+  
+  .mobile-nav-text {
+    font-size: 10px !important;
+  }
+}
+
 .app-bottom-nav {
   display: none;
 }

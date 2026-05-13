@@ -7,15 +7,7 @@ from typing import List
 
 router = APIRouter(prefix="/api/favorites", tags=["favorites"])
 
-# For now, we hardcode user_id=1 to simulate a logged in user until authentication is built
-def get_current_user(db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == 1).first()
-    if not user:
-        user = User(username="testuser", email="test@example.com")
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    return user
+from app.routes.auth import get_current_user
 
 @router.get("/", response_model=List[TrackResponse])
 def get_favorites(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

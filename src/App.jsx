@@ -14,6 +14,7 @@ import PlaylistView from './components/PlaylistView';
 import PlaylistModal from './components/PlaylistModal';
 import Player from './components/Player';
 import YoutubePlayerManager from './components/YoutubePlayerManager';
+import AuthModal from './components/AuthModal';
 
 // Helpers
 const decodeHTML = (html) => {
@@ -42,6 +43,7 @@ const fetchRelatedTracks = async (videoId) => {
 };
 
 function App() {
+  const [token, setToken] = useState(localStorage.getItem('token'));
   const [activeTab, setActiveTab] = useState('discover');
   const [activeContext, setActiveContext] = useState(null);
   const [globalQuery, setGlobalQuery] = useState('');
@@ -85,10 +87,35 @@ function App() {
   // Backend API Integration
   const API_BASE_URL = 'http://localhost:8000/api';
   const [likedSongs, setLikedSongs] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
+
+  const fetchPlaylists = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/playlists/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPlaylists(data);
+      }
+    } catch (e) {
+      console.error("Failed to load playlists", e);
+    }
+  };
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/favorites/`)
-      .then(res => res.json())
+    if (!token) return;
+    fetch(`${API_BASE_URL}/favorites/`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => {
+        if (!res.ok) {
+           if (res.status === 401) { setToken(null); localStorage.removeItem('token'); }
+           throw new Error('Unauthorized');
+        }
+        return res.json();
+      })
       .then(data => {
         // Map backend TrackResponse format to frontend track format
         const mappedData = data.map(t => ({
@@ -101,7 +128,9 @@ function App() {
         setLikedSongs(mappedData);
       })
       .catch(err => console.error("Failed to load favorites", err));
-  }, []);
+      
+    fetchPlaylists();
+  }, [token]);
 
   const toggleLike = useCallback(async (track) => {
     // Optimistic UI update
@@ -115,7 +144,10 @@ function App() {
     try {
       await fetch(`${API_BASE_URL}/favorites/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           track_id: track.id,
           title: track.title,
@@ -332,13 +364,26 @@ function App() {
   return (
     <div className="app-container">
       <aside className="app-sidebar">
-        <Sidebar activeTab={activeTab} onTabChange={(tab) => {
-          if (tab === 'search') {
-            if (activeTab === 'search') { setGlobalQuery(''); setInputText(''); }
-            window.history.pushState(null, '', '#search');
-          } else window.history.pushState(null, '', `#${tab}`);
-          setActiveTab(tab);
-        }} />
+        <Sidebar 
+          activeTab={activeTab} 
+          playlists={playlists}
+          onTabChange={(tab, data) => {
+            if (tab === 'search') {
+              if (activeTab === 'search') { setGlobalQuery(''); setInputText(''); }
+              window.history.pushState(null, '', '#search');
+            } else if (data && data.id) {
+              window.history.pushState(null, '', `#${tab}?id=${data.id}`);
+            } else {
+              window.history.pushState(null, '', `#${tab}`);
+            }
+            if (data) setActiveContext(data);
+            setActiveTab(tab);
+          }}
+        onSignOut={() => {
+          setToken(null);
+          localStorage.removeItem('token');
+        }}
+        />
       </aside>
 
       <main className="app-main">
@@ -370,14 +415,14 @@ function App() {
           <div style={{ padding: '8px', cursor: 'pointer', color: 'var(--text-muted)' }}><Bell size={20} /></div>
         </header>
 
-        {activeTab === 'discover' && <MainView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} />}
+        {activeTab === 'discover' && <MainView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
         {activeTab === 'search' && <SearchView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} globalQuery={globalQuery} setGlobalQuery={setGlobalQuery} searchCache={searchCache} setSearchCache={setSearchCache} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
         {activeTab === 'album' && <AlbumView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
         {activeTab === 'artist' && <ArtistView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); }} onBack={() => window.history.back()} />}
         {activeTab === 'queue' && <QueueView queue={queue} queueIndex={queueIndex} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} removeFromQueue={(idx) => setQueue(q => q.filter((_, i) => i !== idx))} reorderQueue={(s, d) => setQueue(q => { const n = [...q]; const [r] = n.splice(s, 1); n.splice(d, 0, r); return n; })} isAutoplay={isAutoplay} setIsAutoplay={setIsAutoplay} />}
         {activeTab === 'favorites' && <FavoritesView likedSongs={likedSongs} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} toggleLike={toggleLike} />}
-        {activeTab === 'library' && <LibraryView onPlayTrack={handlePlayTrack} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
-        {activeTab === 'playlist' && <PlaylistView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
+        {activeTab === 'library' && <LibraryView playlists={playlists} refreshPlaylists={fetchPlaylists} onPlayTrack={handlePlayTrack} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
+        {activeTab === 'playlist' && <PlaylistView context={activeContext} playlists={playlists} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
         {activeTab === 'lyrics' && <LyricsView currentTrack={currentTrack} progress={progress} />}
       </main>
 
@@ -385,6 +430,8 @@ function App() {
         isOpen={playlistModalOpen} 
         onClose={() => setPlaylistModalOpen(false)} 
         track={playlistModalTrack} 
+        playlists={playlists}
+        refreshPlaylists={fetchPlaylists}
         onAddToQueue={(t) => setQueue(q => [...q, t])} 
       />
 
@@ -399,6 +446,10 @@ function App() {
       </div>
 
       <YoutubePlayerManager onReady={handleYoutubeReady} onStateChange={handleYoutubeStateChange} onError={handleYoutubeError} />
+
+      {!token && (
+        <AuthModal onLoginSuccess={(newToken) => setToken(newToken)} />
+      )}
     </div>
   );
 }

@@ -185,7 +185,18 @@ const SearchView = ({
                 const channelHasQuery = queryWords.some(w => w.length > 2 && c.includes(w));
                 if (channelHasQuery && !c.includes("vevo") && !c.includes("- topic")) score += 20;
 
-                // 3. Audio > Video to prevent 150 errors
+                // 3. Exact query match boost (crucial for dropdown suggestion consistency)
+                const gq = globalQuery.toLowerCase();
+                const cleanT = t.replace(/[^a-z0-9]/g, '');
+                const cleanGq = gq.replace(/[^a-z0-9]/g, '');
+                
+                if (cleanGq === cleanT) {
+                  score += 200;
+                } else if (gq.length > 12 && t.includes(gq)) {
+                  score += 150;
+                }
+
+                // 4. Audio > Video to prevent 150 errors
                 if (t.includes("official audio")) score += 50;
                 else if (t.includes("official")) score += 10;
                 

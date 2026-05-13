@@ -1,25 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { Music, Play, Plus } from 'lucide-react';
 
-const LibraryView = ({ onPlayTrack, onNavigate }) => {
-  const [playlists, setPlaylists] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+const LibraryView = ({ playlists = [], refreshPlaylists, onPlayTrack, onNavigate }) => {
+  const [isCreating, setIsCreating] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const API_BASE_URL = 'http://localhost:8000/api';
 
-  useEffect(() => {
-    fetchPlaylists();
-  }, []);
-
-  const fetchPlaylists = async () => {
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!newPlaylistName.trim() || isSubmitting) return;
+    
+    setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/playlists/`);
-      const data = await res.json();
-      setPlaylists(data);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/playlists/`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: newPlaylistName })
+      });
+      if (res.ok) {
+        setNewPlaylistName('');
+        setIsCreating(false);
+        if (refreshPlaylists) refreshPlaylists();
+      }
     } catch (e) {
       console.error(e);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -27,20 +39,58 @@ const LibraryView = ({ onPlayTrack, onNavigate }) => {
     <div className="animate-enter" style={{ padding: '32px', paddingBottom: '120px', minHeight: '100%' }}>
       <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '32px' }}>Your Library</h1>
       
-      {isLoading ? (
-        <div style={{ color: 'var(--text-muted)' }}>Loading playlists...</div>
-      ) : playlists.length === 0 ? (
-        <div style={{ 
-          display: 'flex', flexDirection: 'column', alignItems: 'center', 
-          justifyContent: 'center', padding: '64px 0', color: 'var(--text-muted)' 
-        }}>
-          <Music size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-          <h2>No playlists yet</h2>
-          <p>Click the + icon on any track to create your first playlist.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '24px' }}>
+        
+        {/* Create Playlist Card */}
+        <div 
+          style={{
+            backgroundColor: isCreating ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+            padding: '16px',
+            borderRadius: '8px',
+            cursor: isCreating ? 'default' : 'pointer',
+            border: '1px dashed rgba(255,255,255,0.2)',
+            transition: 'background 0.2s',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '16px',
+            minHeight: '260px'
+          }}
+          onClick={() => !isCreating && setIsCreating(true)}
+          onMouseOver={(e) => !isCreating && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)')}
+          onMouseOut={(e) => !isCreating && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)')}
+        >
+          {isCreating ? (
+            <form onSubmit={handleCreate} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input 
+                type="text" 
+                placeholder="Playlist Name" 
+                autoFocus
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                style={{ width: '100%', padding: '12px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', outline: 'none' }}
+              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="submit" disabled={isSubmitting || !newPlaylistName.trim()} style={{ flex: 1, padding: '8px', backgroundColor: '#1ed760', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  Create
+                </button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setIsCreating(false); }} style={{ flex: 1, padding: '8px', backgroundColor: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Plus size={32} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>Create Playlist</h3>
+            </>
+          )}
         </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '24px' }}>
-          {playlists.map(playlist => (
+
+        {playlists.map(playlist => (
             <div 
               key={playlist.id}
               onClick={() => onNavigate('playlist', { id: playlist.id, title: playlist.name })}
@@ -75,8 +125,7 @@ const LibraryView = ({ onPlayTrack, onNavigate }) => {
               </div>
             </div>
           ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 };

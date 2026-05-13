@@ -1,13 +1,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# We'll use SQLite for local development so it works out of the box.
-# For production PostgreSQL, you would change this to:
-# SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost/dbname"
-SQLALCHEMY_DATABASE_URL = "sqlite:///./resonance.db"
+from app.config import settings
+
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
+
+# Only SQLite requires check_same_thread=False
+connect_args = {}
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    connect_args["check_same_thread"] = False
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, connect_args=connect_args
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

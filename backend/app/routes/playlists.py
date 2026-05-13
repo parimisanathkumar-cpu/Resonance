@@ -7,15 +7,7 @@ from typing import List
 
 router = APIRouter(prefix="/api/playlists", tags=["playlists"])
 
-# Mock authentication
-def get_current_user(db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == 1).first()
-    if not user:
-        user = User(username="testuser", email="test@example.com")
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    return user
+from app.routes.auth import get_current_user
 
 @router.get("/", response_model=List[PlaylistResponse])
 def get_playlists(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

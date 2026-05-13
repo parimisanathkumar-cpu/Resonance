@@ -16,7 +16,10 @@ const PlaylistModal = ({ isOpen, onClose, track, onAddToQueue }) => {
 
   const fetchPlaylists = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/playlists/`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/playlists/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const data = await res.json();
       setPlaylists(data);
     } catch (e) {
@@ -29,9 +32,13 @@ const PlaylistModal = ({ isOpen, onClose, track, onAddToQueue }) => {
     if (!newPlaylistName.trim()) return;
     
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE_URL}/playlists/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ name: newPlaylistName })
       });
       const newPlaylist = await res.json();
@@ -45,9 +52,13 @@ const PlaylistModal = ({ isOpen, onClose, track, onAddToQueue }) => {
 
   const handleAddToPlaylist = async (playlistId) => {
     try {
+      const token = localStorage.getItem('token');
       await fetch(`${API_BASE_URL}/playlists/${playlistId}/tracks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           track_id: track.id,
           title: track.title,

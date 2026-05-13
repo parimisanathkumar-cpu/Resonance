@@ -35,7 +35,14 @@ class PlaylistResponse(BaseModel):
         orm_mode = True
 
 class UserCreate(UserBase):
-    pass
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
 
 class UserResponse(UserBase):
     id: int

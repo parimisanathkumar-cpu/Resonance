@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-from app.routes import search, favorites, playlists
+from app.routes import search, favorites, playlists, auth
 
 # Create DB tables (in production use Alembic)
 Base.metadata.create_all(bind=engine)
@@ -17,6 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(search.router)
 app.include_router(favorites.router)
 app.include_router(playlists.router)

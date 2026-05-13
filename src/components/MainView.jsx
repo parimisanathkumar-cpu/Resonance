@@ -1,33 +1,67 @@
 import { Play, Pause, Heart, Plus } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
-// MOCK DATA FOR DISCOVER DASHBOARD
-const RECENT_PLAYS = [
-  { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio', coverArt: 'https://i.ytimg.com/vi/jfKfPfyJRdk/maxresdefault.jpg' },
-  { id: 'K4DyBUG242c', title: 'On & On (feat. Daniel Levi)', coverArt: 'https://i.ytimg.com/vi/K4DyBUG242c/maxresdefault.jpg' },
-  { id: 'dQw4w9WgXcQ', title: 'Never Gonna Give You Up', coverArt: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg' },
-  { id: '4xDzrUhVKVA', title: 'Synthwave Radio', coverArt: 'https://i.ytimg.com/vi/4xDzrUhVKVA/maxresdefault.jpg' },
-  { id: '2Vv-BfVoq4g', title: 'Ed Sheeran - Perfect', coverArt: 'https://i.ytimg.com/vi/2Vv-BfVoq4g/hqdefault.jpg' },
-  { id: 'fJ9rUzIMcZQ', title: 'Bohemian Rhapsody', coverArt: 'https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg' }
-];
-
-const MADE_FOR_YOU = [
-  { id: 'mix1', title: 'Daily Mix 1', desc: 'Ed Sheeran, Coldplay, and more', coverArt: 'https://images.unsplash.com/photo-1493225457124-a1a2a5f5f468?auto=format&fit=crop&w=400&q=80' },
-  { id: 'mix2', title: 'Discover Weekly', desc: 'New music updated every Monday', coverArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80' },
-  { id: 'mix3', title: 'Release Radar', desc: 'Catch up on the latest releases', coverArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80' },
-  { id: 'mix4', title: 'Chill Vibes', desc: 'Kick back and relax', coverArt: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?auto=format&fit=crop&w=400&q=80' },
-  { id: 'mix5', title: 'Focus Flow', desc: 'Deep focus instrumental beats', coverArt: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80' }
-];
-
-const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpenPlaylistModal, likedSongs, toggleLike }) => {
+const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpenPlaylistModal, likedSongs, toggleLike, onNavigate }) => {
   const [greeting, setGreeting] = useState('');
+  const [trendingTracks, setTrendingTracks] = useState([]);
+  const [curatedPlaylists, setCuratedPlaylists] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Helper to decode HTML entities
+  const decodeHTML = (html) => {
+    const txt = document.createElement('textarea');
+    txt.innerHTML = html;
+    return txt.value;
+  };
 
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Good morning');
     else if (hour < 18) setGreeting('Good afternoon');
     else setGreeting('Good evening');
+
+    fetchHomeData();
   }, []);
+
+  const fetchHomeData = async () => {
+    setIsLoading(true);
+    try {
+      const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+      
+      // Fetch Trending Music
+      const trendingRes = await fetch(`https://youtube.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&videoCategoryId=10&maxResults=8&regionCode=US&key=${apiKey}`);
+      const trendingData = await trendingRes.json();
+      
+      if (trendingData.items) {
+        setTrendingTracks(trendingData.items.map(item => ({
+          id: item.id,
+          type: 'song',
+          title: decodeHTML(item.snippet.title),
+          artist: decodeHTML(item.snippet.channelTitle),
+          artistId: item.snippet.channelId,
+          coverArt: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url
+        })));
+      }
+
+      // Fetch Curated Playlists
+      const playlistsRes = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=8&q=top+music+hits+2025&type=playlist&key=${apiKey}`);
+      const playlistsData = await playlistsRes.json();
+      
+      if (playlistsData.items) {
+        setCuratedPlaylists(playlistsData.items.map(item => ({
+          id: item.id.playlistId,
+          type: 'album',
+          title: decodeHTML(item.snippet.title),
+          desc: decodeHTML(item.snippet.channelTitle),
+          coverArt: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url
+        })));
+      }
+    } catch (e) {
+      console.error("Failed to fetch home data", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="animate-enter" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
@@ -49,14 +83,18 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpe
           .recent-card:hover .row-actions { opacity: 1 !important; }
         `}</style>
 
-        {/* Top 6 Recent Plays (Blocky layout) */}
+        {/* Trending Tracks */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: '16px',
           marginBottom: '48px'
         }}>
-          {RECENT_PLAYS.map(track => {
+          {isLoading ? (
+            Array(6).fill(0).map((_, i) => (
+              <div key={i} style={{ height: '80px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+            ))
+          ) : trendingTracks.map(track => {
             const isThisTrackActive = currentTrack?.id === track.id;
             const isTrackPlaying = isThisTrackActive && globalIsPlaying;
 
@@ -64,7 +102,7 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpe
               <div 
                 key={track.id}
                 className="recent-card"
-                onClick={() => onPlayTrack(track, [track])}
+                onClick={() => onPlayTrack(track, trendingTracks)}
                 style={{
                   display: 'flex', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)',
                   borderRadius: '4px', cursor: 'pointer', overflow: 'hidden',
@@ -117,12 +155,17 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpe
         </div>
 
         {/* Made For You Section */}
-        <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px' }}>Made For You</h2>
+        <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px' }}>Top Playlists & Mixes</h2>
         <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '24px', marginBottom: '24px' }}>
-          {MADE_FOR_YOU.map(mix => (
+          {isLoading ? (
+            Array(5).fill(0).map((_, i) => (
+              <div key={i} style={{ minWidth: '200px', height: '260px', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
+            ))
+          ) : curatedPlaylists.map(mix => (
             <div 
               key={mix.id}
               className="premium-card"
+              onClick={() => onNavigate('album', mix)}
               style={{
                 minWidth: '200px', maxWidth: '200px', padding: '16px', borderRadius: '12px', cursor: 'pointer',
                 display: 'flex', flexDirection: 'column', gap: '16px',
