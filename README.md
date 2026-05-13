@@ -1,4 +1,4 @@
-# 🎵 StreamFlow - Music Player Application
+# 🎵 Resonance - Music Player Application
 
 A modern, feature-rich music player application built with React and Vite, powered by YouTube's vast music library. Stream your favorite music with a beautiful, intuitive interface designed for seamless music discovery and playback.
 
@@ -117,7 +117,7 @@ A modern, feature-rich music player application built with React and Vite, power
 ## 📁 Project Structure
 
 ```
-streamflow/
+resonance/
 ├── src/
 │   ├── components/
 │   │   ├── Player.jsx              # Main playback controls component
@@ -166,7 +166,7 @@ streamflow/
 
    ```bash
    git clone <repository-url>
-   cd streamflow
+   cd resonance
    ```
 
 2. **Install dependencies**
@@ -202,7 +202,7 @@ VITE_API_BASE_URL=http://localhost:8000/api
 VITE_AUTH_TOKEN_KEY=token
 
 # App Configuration
-VITE_APP_NAME=StreamFlow
+VITE_APP_NAME=Resonance
 VITE_APP_VERSION=1.0.0
 ```
 
