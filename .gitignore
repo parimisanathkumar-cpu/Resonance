@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+#use case file
+walkthrough_commands
+vite.config.js

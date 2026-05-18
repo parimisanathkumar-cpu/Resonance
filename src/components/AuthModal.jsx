@@ -58,12 +58,13 @@ const AuthModal = ({ onLoginSuccess }) => {
         });
         const loginData = await loginRes.json();
         
+        if (!loginRes.ok) throw new Error(loginData.detail || 'Auto-login failed');
+        
         localStorage.setItem('token', loginData.access_token);
         onLoginSuccess(loginData.access_token);
       }
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };

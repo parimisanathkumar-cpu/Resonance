@@ -1,6 +1,6 @@
 import { Compass, Library, FolderHeart, Search as SearchIcon, Disc3, LogOut } from 'lucide-react';
 
-const Sidebar = ({ activeTab, playlists = [], onTabChange, onSignOut }) => {
+const Sidebar = ({ activeTab, playlists = [], onTabChange, onSignOut, currentTrack, isWidgetOpen }) => {
   const containerStyle = {
     padding: '24px 16px',
     display: 'flex',
@@ -117,6 +117,26 @@ const Sidebar = ({ activeTab, playlists = [], onTabChange, onSignOut }) => {
       )}
       
       <div style={{ flexGrow: playlists && playlists.length > 0 ? 0 : 1, marginTop: 'auto' }} className="mobile-hide" />
+      
+      {currentTrack && isWidgetOpen && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px',
+          margin: '0 0 16px 0', borderRadius: '16px',
+          backgroundColor: 'rgba(255,255,255,0.03)',
+          border: '1px solid var(--border-glass)',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          animation: 'fadeIn 0.3s ease'
+        }} className="mobile-hide">
+          <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+          <img src={currentTrack.coverArt} alt={currentTrack.title} style={{ width: '100%', aspectRatio: '1/1', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }} />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>{currentTrack.title}</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{currentTrack.artist}</span>
+          </div>
+        </div>
+      )}
+
       <div 
         style={navItemStyle} 
         className="mobile-hide"

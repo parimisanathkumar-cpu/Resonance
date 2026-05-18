@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Play, Pause, Loader2, Heart, Plus } from "lucide-react";
+import { Search, Play, Pause, Loader2, Heart, Plus, MoreVertical } from "lucide-react";
 
 const MOCK_CATEGORIES = [
   "All",
@@ -10,32 +10,15 @@ const MOCK_CATEGORIES = [
   "Podcasts",
 ];
 
-const MOCK_RESULTS = [
-  {
-    id: "jfKfPfyJRdk",
-    title: "Lofi Hip Hop Radio - Beats to Relax/Study to",
-    artist: "Lofi Girl",
-    coverArt: "https://i.ytimg.com/vi/jfKfPfyJRdk/maxresdefault.jpg",
-  },
-  {
-    id: "K4DyBUG242c",
-    title: "Cartoon - On & On (feat. Daniel Levi) [NCS Release]",
-    artist: "NoCopyrightSounds",
-    coverArt: "https://i.ytimg.com/vi/K4DyBUG242c/maxresdefault.jpg",
-  },
-  {
-    id: "dQw4w9WgXcQ",
-    title: "Rick Astley - Never Gonna Give You Up (Official Music Video)",
-    artist: "Rick Astley",
-    coverArt: "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-  },
-  {
-    id: "4xDzrUhVKVA",
-    title: "Synthwave Radio - Beats to chill/game to",
-    artist: "Lofi Girl",
-    coverArt: "https://i.ytimg.com/vi/4xDzrUhVKVA/maxresdefault.jpg",
-  },
-];
+const SkeletonRow = () => (
+  <div style={{ display: "flex", alignItems: "center", padding: "8px 16px", gap: "16px", animation: "pulse 1.5s infinite" }}>
+    <div style={{ width: "40px", height: "40px", borderRadius: "4px", backgroundColor: "rgba(255,255,255,0.05)" }} />
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: "8px" }}>
+      <div style={{ height: "16px", width: "60%", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "4px" }} />
+      <div style={{ height: "12px", width: "40%", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "4px" }} />
+    </div>
+  </div>
+);
 
 const SearchView = ({
   currentTrack,
@@ -51,7 +34,7 @@ const SearchView = ({
   toggleLike,
 }) => {
   const [activeCategory, setActiveCategory] = useState("All");
-  const [songResults, setSongResults] = useState(MOCK_RESULTS);
+  const [songResults, setSongResults] = useState([]);
   const [artistResults, setArtistResults] = useState([]);
   const [albumResults, setAlbumResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -65,7 +48,7 @@ const SearchView = ({
 
   useEffect(() => {
     if (!globalQuery.trim()) {
-      setSongResults(MOCK_RESULTS);
+      setSongResults([]);
       setArtistResults([]);
       setAlbumResults([]);
       return;
@@ -388,7 +371,20 @@ const SearchView = ({
         .list-row:hover .row-play-btn { opacity: 1 !important; }
       `}</style>
 
-      {songResults.length > 0 ? (
+      {isSearching ? (
+        <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 350px", display: "flex", flexDirection: "column" }}>
+            <h2 style={{ fontSize: "24px", fontWeight: "700", marginBottom: "16px" }}>Top result</h2>
+            <div style={{ height: "240px", backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "8px", animation: "pulse 1.5s infinite" }} />
+          </div>
+          <div style={{ flex: "2 1 400px", display: "flex", flexDirection: "column" }}>
+            <h2 style={{ fontSize: "24px", fontWeight: "700", marginBottom: "16px" }}>Songs</h2>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
+            </div>
+          </div>
+        </div>
+      ) : songResults.length > 0 ? (
         <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
           {/* Top Result Column */}
           <div
@@ -733,7 +729,7 @@ const SearchView = ({
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (onOpenPlaylistModal) onOpenPlaylistModal(track);
+                          if (onOpenPlaylistModal) onOpenPlaylistModal(e, track);
                         }}
                         style={{
                           cursor: "pointer",
@@ -745,7 +741,7 @@ const SearchView = ({
                           (e.currentTarget.style.opacity = 0.7)
                         }
                       >
-                        <Plus size={18} color="var(--text-muted)" />
+                        <MoreVertical size={18} color="var(--text-muted)" />
                       </div>
                       <span
                         style={{
@@ -951,13 +947,13 @@ const SearchView = ({
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (onOpenPlaylistModal) onOpenPlaylistModal(track);
+                            if (onOpenPlaylistModal) onOpenPlaylistModal(e, track);
                           }}
                           style={{ cursor: "pointer", opacity: 0.7 }}
                           onMouseOver={(e) => (e.currentTarget.style.opacity = 1)}
                           onMouseOut={(e) => (e.currentTarget.style.opacity = 0.7)}
                         >
-                          <Plus size={18} color="var(--text-muted)" />
+                          <MoreVertical size={18} color="var(--text-muted)" />
                         </div>
                       </div>
                     </div>

@@ -88,3 +88,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 @router.get("/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+@router.get("/users", response_model=list[schemas.UserResponse])
+def get_all_users(db: Session = Depends(get_db)):
+    # Note: In a production app, you'd want to restrict this to admins only!
+    users = db.query(models.User).all()
+    return users

@@ -11,8 +11,9 @@ import FavoritesView from './components/FavoritesView';
 import LyricsView from './components/LyricsView';
 import LibraryView from './components/LibraryView';
 import PlaylistView from './components/PlaylistView';
-import PlaylistModal from './components/PlaylistModal';
+import TrackContextMenu from './components/TrackContextMenu';
 import Player from './components/Player';
+import ExpandedPlayer from './components/ExpandedPlayer';
 import YoutubePlayerManager from './components/YoutubePlayerManager';
 import AuthModal from './components/AuthModal';
 
@@ -57,6 +58,10 @@ function App() {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(70);
 
+  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
+  const [isSidebarWidgetOpen, setIsSidebarWidgetOpen] = useState(false);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
+
   // Queue State
   const [queue, setQueue] = useState([]);
   const [queueIndex, setQueueIndex] = useState(-1);
@@ -64,9 +69,8 @@ function App() {
   const [isRepeat, setIsRepeat] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(true);
 
-  // Playlist Modal State
-  const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
-  const [playlistModalTrack, setPlaylistModalTrack] = useState(null);
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState(null);
 
   // Refs for stable callbacks
   const queueRef = useRef([]);
@@ -281,7 +285,7 @@ function App() {
             setProgress(currentTime);
           }
         } catch(e) {}
-      }, 500);
+      }, 50); // 50ms for buttery smooth lyrics sync
     }
     return () => clearInterval(interval);
   }, [isPlaying]);
@@ -304,15 +308,13 @@ function App() {
         setActiveTab('album');
         const params = new URLSearchParams(hash.split('?')[1]);
         if (params.get('id')) setActiveContext({ id: params.get('id'), title: decodeURIComponent(params.get('title') || ''), artist: decodeURIComponent(params.get('artist') || ''), coverArt: decodeURIComponent(params.get('cover') || '') });
-      } else if (hash === '#queue') setActiveTab('queue');
-      else if (hash === '#favorites') setActiveTab('favorites');
+      } else if (hash === '#favorites') setActiveTab('favorites');
       else if (hash === '#library') setActiveTab('library');
       else if (hash.startsWith('#playlist')) {
         setActiveTab('playlist');
         const params = new URLSearchParams(hash.split('?')[1]);
         if (params.get('id')) setActiveContext({ id: params.get('id'), title: decodeURIComponent(params.get('title') || '') });
       }
-      else if (hash === '#lyrics') setActiveTab('lyrics');
     };
     window.addEventListener('popstate', handlePopState);
     handlePopState();
@@ -367,6 +369,8 @@ function App() {
         <Sidebar 
           activeTab={activeTab} 
           playlists={playlists}
+          currentTrack={currentTrack}
+          isWidgetOpen={isSidebarWidgetOpen}
           onTabChange={(tab, data) => {
             if (tab === 'search') {
               if (activeTab === 'search') { setGlobalQuery(''); setInputText(''); }
@@ -415,29 +419,96 @@ function App() {
           <div style={{ padding: '8px', cursor: 'pointer', color: 'var(--text-muted)' }}><Bell size={20} /></div>
         </header>
 
-        {activeTab === 'discover' && <MainView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
-        {activeTab === 'search' && <SearchView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} globalQuery={globalQuery} setGlobalQuery={setGlobalQuery} searchCache={searchCache} setSearchCache={setSearchCache} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
-        {activeTab === 'album' && <AlbumView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
-        {activeTab === 'artist' && <ArtistView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); }} onBack={() => window.history.back()} />}
-        {activeTab === 'queue' && <QueueView queue={queue} queueIndex={queueIndex} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} removeFromQueue={(idx) => setQueue(q => q.filter((_, i) => i !== idx))} reorderQueue={(s, d) => setQueue(q => { const n = [...q]; const [r] = n.splice(s, 1); n.splice(d, 0, r); return n; })} isAutoplay={isAutoplay} setIsAutoplay={setIsAutoplay} />}
+        {activeTab === 'discover' && <MainView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(e, t) => setContextMenu({ x: e.clientX, y: e.clientY, track: t })} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
+        {activeTab === 'search' && <SearchView currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} globalQuery={globalQuery} setGlobalQuery={setGlobalQuery} searchCache={searchCache} setSearchCache={setSearchCache} onOpenPlaylistModal={(e, t) => setContextMenu({ x: e.clientX, y: e.clientY, track: t })} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
+        {activeTab === 'album' && <AlbumView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(e, t) => setContextMenu({ x: e.clientX, y: e.clientY, track: t })} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
+        {activeTab === 'artist' && <ArtistView context={activeContext} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(e, t) => setContextMenu({ x: e.clientX, y: e.clientY, track: t })} likedSongs={likedSongs} toggleLike={toggleLike} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); }} onBack={() => window.history.back()} />}
         {activeTab === 'favorites' && <FavoritesView likedSongs={likedSongs} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} toggleLike={toggleLike} />}
         {activeTab === 'library' && <LibraryView playlists={playlists} refreshPlaylists={fetchPlaylists} onPlayTrack={handlePlayTrack} onNavigate={(tab, data) => { setActiveContext(data); setActiveTab(tab); window.history.pushState(null, '', `#${tab}?id=${data.id}`); }} />}
-        {activeTab === 'playlist' && <PlaylistView context={activeContext} playlists={playlists} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(t) => { setPlaylistModalTrack(t); setPlaylistModalOpen(true); }} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
-        {activeTab === 'lyrics' && <LyricsView currentTrack={currentTrack} progress={progress} />}
+        {activeTab === 'playlist' && <PlaylistView context={activeContext} playlists={playlists} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} onOpenPlaylistModal={(e, t) => setContextMenu({ x: e.clientX, y: e.clientY, track: t })} likedSongs={likedSongs} toggleLike={toggleLike} onBack={() => window.history.back()} />}
       </main>
 
-      <PlaylistModal 
-        isOpen={playlistModalOpen} 
-        onClose={() => setPlaylistModalOpen(false)} 
-        track={playlistModalTrack} 
-        playlists={playlists}
-        refreshPlaylists={fetchPlaylists}
-        onAddToQueue={(t) => setQueue(q => [...q, t])} 
-      />
+      {contextMenu && (
+        <TrackContextMenu 
+          x={contextMenu.x}
+          y={contextMenu.y}
+          track={contextMenu.track}
+          playlists={playlists}
+          onClose={() => setContextMenu(null)}
+          onAddToQueue={(t) => {
+            if (!currentTrack) handlePlayTrack(t);
+            else {
+              setQueue(q => {
+                const newQ = [...q];
+                // Find the last index of a user-added track that is after the current playing index
+                let insertIdx = queueIndex + 1;
+                while (insertIdx < newQ.length && newQ[insertIdx].isUserAdded) {
+                  insertIdx++;
+                }
+                newQ.splice(insertIdx, 0, { ...t, isUserAdded: true });
+                return newQ;
+              });
+            }
+          }}
+          onPlayNext={(t) => {
+            if (!currentTrack) handlePlayTrack(t);
+            else {
+              setQueue(q => {
+                const newQ = [...q];
+                newQ.splice(queueIndex + 1, 0, { ...t, isUserAdded: true });
+                return newQ;
+              });
+            }
+          }}
+          onAddToPlaylist={async (playlistId, track) => {
+            try {
+              const res = await fetch(`${API_BASE_URL}/playlists/${playlistId}/tracks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ track_id: track.id, title: track.title, artist: track.artist, cover_art: track.coverArt })
+              });
+              if (res.ok) {
+                // Toast notification could go here
+              }
+            } catch (e) { console.error(e); }
+          }}
+          onCreatePlaylist={async (name) => {
+            try {
+              const res = await fetch(`${API_BASE_URL}/playlists/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ name })
+              });
+              if (res.ok) fetchPlaylists();
+            } catch (e) { console.error(e); }
+          }}
+        />
+      )}
 
       <div className="animate-enter floating-player">
-        <Player track={currentTrack} isPlaying={isPlaying} onTogglePlay={() => handlePlayTrack(currentTrack)} progress={progress} duration={duration} onSeek={(t) => playerRef.current?.seekTo(t, true)} volume={volume} onVolumeChange={setVolume} onNext={playNext} onPrev={playPrev} onShuffle={() => setIsShuffle(!isShuffle)} onRepeat={() => setIsRepeat(!isRepeat)} isShuffle={isShuffle} isRepeat={isRepeat} onOpenQueue={() => { window.history.pushState(null, '', '#queue'); setActiveTab('queue'); }} onOpenLyrics={() => { window.history.pushState(null, '', '#lyrics'); setActiveTab('lyrics'); }} />
+        <Player track={currentTrack} isPlaying={isPlaying} onTogglePlay={() => handlePlayTrack(currentTrack)} progress={progress} duration={duration} onSeek={(t) => playerRef.current?.seekTo(t, true)} volume={volume} onVolumeChange={setVolume} onNext={playNext} onPrev={playPrev} onShuffle={() => setIsShuffle(!isShuffle)} onRepeat={() => setIsRepeat(!isRepeat)} isShuffle={isShuffle} isRepeat={isRepeat} onOpenQueue={() => setIsQueueOpen(!isQueueOpen)} onOpenLyrics={() => setIsPlayerExpanded(true)} onExpandPlayer={() => setIsSidebarWidgetOpen(prev => !prev)} />
       </div>
+
+      {isPlayerExpanded && (
+        <ExpandedPlayer currentTrack={currentTrack} isPlaying={isPlaying} progress={progress} duration={duration} onTogglePlay={() => handlePlayTrack(currentTrack)} onNext={playNext} onPrev={playPrev} onSeek={(t) => playerRef.current?.seekTo(t, true)} onClose={() => setIsPlayerExpanded(false)} isShuffle={isShuffle} isRepeat={isRepeat} onShuffle={() => setIsShuffle(!isShuffle)} onRepeat={() => setIsRepeat(!isRepeat)} />
+      )}
+
+      {isQueueOpen && (
+        <>
+          <div onClick={() => setIsQueueOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 999 }} />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: '400px', backgroundColor: 'rgba(30,30,35,0.98)', backdropFilter: 'blur(20px)',
+            borderLeft: '1px solid var(--border-glass)', zIndex: 1000, animation: 'slideLeft 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+            boxShadow: '-10px 0 30px rgba(0,0,0,0.5)'
+          }}>
+            <style>{`@keyframes slideLeft { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px 0 0' }}>
+               <button onClick={() => setIsQueueOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={24} /></button>
+            </div>
+            <QueueView queue={queue} queueIndex={queueIndex} currentTrack={currentTrack} isPlaying={isPlaying} onPlayTrack={handlePlayTrack} removeFromQueue={(idx) => setQueue(q => q.filter((_, i) => i !== idx))} reorderQueue={(s, d) => setQueue(q => { const n = [...q]; const [r] = n.splice(s, 1); n.splice(d, 0, r); return n; })} isAutoplay={isAutoplay} setIsAutoplay={setIsAutoplay} />
+          </div>
+        </>
+      )}
 
       <div className="app-bottom-nav">
         <div onClick={() => { window.history.pushState(null, '', '#discover'); setActiveTab('discover'); }} style={{ color: activeTab === 'discover' ? '#1ed760' : 'var(--text-muted)' }}><Home size={24} /></div>

@@ -1,4 +1,4 @@
-import { Play, Pause, Heart, Plus } from 'lucide-react';
+import { Play, Pause, Heart, Plus, MoreVertical } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpenPlaylistModal, likedSongs, toggleLike, onNavigate }) => {
@@ -86,13 +86,13 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpe
         {/* Trending Tracks */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '16px',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gap: '24px',
           marginBottom: '48px'
         }}>
           {isLoading ? (
             Array(6).fill(0).map((_, i) => (
-              <div key={i} style={{ height: '80px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} />
+              <div key={i} style={{ height: '240px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
             ))
           ) : trendingTracks.map(track => {
             const isThisTrackActive = currentTrack?.id === track.id;
@@ -101,54 +101,68 @@ const MainView = ({ currentTrack, isPlaying: globalIsPlaying, onPlayTrack, onOpe
             return (
               <div 
                 key={track.id}
-                className="recent-card"
+                className="premium-card"
                 onClick={() => onPlayTrack(track, trendingTracks)}
                 style={{
-                  display: 'flex', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderRadius: '4px', cursor: 'pointer', overflow: 'hidden',
-                  transition: 'background-color 0.2s', position: 'relative'
+                  padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', gap: '16px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)', transition: 'background-color 0.2s', position: 'relative'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
                   e.currentTarget.querySelector('.play-btn-circle').style.opacity = '1';
+                  e.currentTarget.querySelector('.play-btn-circle').style.transform = 'translateY(0)';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
-                  e.currentTarget.querySelector('.play-btn-circle').style.opacity = isThisTrackActive ? '1' : '0';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                  if (!isThisTrackActive) {
+                    e.currentTarget.querySelector('.play-btn-circle').style.opacity = '0';
+                    e.currentTarget.querySelector('.play-btn-circle').style.transform = 'translateY(8px)';
+                  }
                 }}
               >
-                <img src={track.coverArt} alt={track.title} style={{ width: '80px', height: '80px', objectFit: 'cover' }} />
-                <h3 style={{ fontSize: '15px', fontWeight: '600', padding: '0 16px', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {track.title}
-                </h3>
-                
-                <div className="row-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '64px', transition: 'opacity 0.2s', opacity: 0 }}>
-                  <div onClick={(e) => { e.stopPropagation(); toggleLike(track); }} style={{ cursor: 'pointer', padding: '4px' }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.1)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
-                    <Heart size={16} fill={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'none'} color={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'var(--text-muted)'} />
-                  </div>
-                  <div onClick={(e) => { e.stopPropagation(); onOpenPlaylistModal(track); }} style={{ cursor: 'pointer', padding: '4px' }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.1)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
-                    <Plus size={18} color="var(--text-muted)" />
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1' }}>
+                  <img src={track.coverArt} alt={track.title} style={{ width: '100%', height: '100%', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }} />
+                  
+                  {/* Play Button Overlay */}
+                  <div 
+                    className="play-btn-circle"
+                    style={{
+                      position: 'absolute', right: '8px', bottom: '8px',
+                      width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#1ed760',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                      opacity: isThisTrackActive ? '1' : '0',
+                      transition: 'all 0.3s cubic-bezier(0.3, 0, 0, 1)',
+                      transform: isThisTrackActive ? 'translateY(0)' : 'translateY(8px)'
+                    }}
+                  >
+                    {isTrackPlaying ? (
+                       <Pause fill="black" color="black" size={24} />
+                    ) : (
+                       <Play fill="black" color="black" size={24} style={{ marginLeft: '4px' }}/>
+                    )}
                   </div>
                 </div>
-                
-                {/* Play Button Overlay */}
-                <div 
-                  className="play-btn-circle"
-                  style={{
-                    position: 'absolute', right: '16px',
-                    width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#1ed760',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    opacity: isThisTrackActive ? '1' : '0',
-                    transition: 'opacity 0.2s'
-                  }}
-                >
-                  {isTrackPlaying ? (
-                     <Pause fill="black" color="black" size={18} />
-                  ) : (
-                     <Play fill="black" color="black" size={18} style={{ marginLeft: '2px' }}/>
-                  )}
+
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, lineHeight: '1.4', wordBreak: 'break-word' }}>
+                    {track.title}
+                  </h3>
+                  <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '4px 0 0 0', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {track.artist}
+                  </p>
                 </div>
+
+                <div className="row-actions" style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', gap: '8px', opacity: 0, transition: 'opacity 0.2s', zIndex: 10 }}>
+                   <div onClick={(e) => { e.stopPropagation(); toggleLike(track); }} style={{ cursor: 'pointer', padding: '6px', borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='rgba(0,0,0,0.8)'} onMouseOut={e=>e.currentTarget.style.backgroundColor='rgba(0,0,0,0.5)'}>
+                     <Heart size={16} fill={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'none'} color={(likedSongs || []).some(t => t.id === track.id) ? '#1ed760' : 'white'} />
+                   </div>
+                   <div onClick={(e) => { e.stopPropagation(); onOpenPlaylistModal(e, track); }} style={{ cursor: 'pointer', padding: '6px', borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='rgba(0,0,0,0.8)'} onMouseOut={e=>e.currentTarget.style.backgroundColor='rgba(0,0,0,0.5)'}>
+                     <MoreVertical size={16} color="white" />
+                   </div>
+                </div>
+
               </div>
             );
           })}

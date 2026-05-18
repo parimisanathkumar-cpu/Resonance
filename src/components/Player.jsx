@@ -1,6 +1,6 @@
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, List, Mic2 } from 'lucide-react';
 
-const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, volume, onVolumeChange, onNext, onPrev, onShuffle, onRepeat, isShuffle, isRepeat, onOpenQueue, onOpenLyrics }) => {
+const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, volume, onVolumeChange, onNext, onPrev, onShuffle, onRepeat, isShuffle, isRepeat, onOpenQueue, onOpenLyrics, onExpandPlayer }) => {
   const containerStyle = {
     display: 'flex',
     alignItems: 'center',
@@ -110,7 +110,13 @@ const Player = ({ track, isPlaying, onTogglePlay, progress, duration, onSeek, vo
   return (
     <div className="player-container" style={containerStyle}>
       {/* Track Info */}
-      <div className="player-track-info" style={trackInfoStyle}>
+      <div 
+        className="player-track-info" 
+        style={{...trackInfoStyle, cursor: track ? 'pointer' : 'default', transition: 'opacity 0.2s'}} 
+        onClick={track ? onExpandPlayer : undefined}
+        onMouseOver={e => track && (e.currentTarget.style.opacity = '0.8')}
+        onMouseOut={e => track && (e.currentTarget.style.opacity = '1')}
+      >
         {track ? (
           <>
             <img 

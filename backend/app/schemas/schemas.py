@@ -46,6 +46,7 @@ class TokenData(BaseModel):
 
 class UserResponse(UserBase):
     id: int
+    is_admin: bool = False
     liked_songs: List[TrackResponse] = []
     playlists: List[PlaylistResponse] = []
 
